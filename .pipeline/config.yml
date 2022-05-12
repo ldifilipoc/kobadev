@@ -1,0 +1,44 @@
+---
+general:
+  buildtool: "mta"
+
+stages:
+  Build:
+    mavenExecuteStaticCodeChecks: false
+    npmExecuteLint: true
+
+  Additional Unit Tests:
+    npmExecuteScripts: false
+    karmaExecuteScripts: false
+
+  Acceptance:
+    CloudFoundryDeploy: false
+    cfApiEndpoint: "https://api.cf.us10.hana.ondemand.com"
+    cfOrg: "Koba Colombia S.A.S."
+    cfSpace: "KOBA_DEV"
+    cfAppName: "app"
+    cfCredntialsId: "cfdeploy"
+    uiVeri5ExecuteTests: false
+
+  Release
+    CloudFoundryDeploy: true
+    cfApiEndpoint: "https://api.cf.us10.hana.ondemand.com"
+    cfOrg: "Koba Colombia S.A.S."
+    cfSpace: "KOBA_DEV"
+    cfAppName: "app"
+    cfCredntialsId: "cfdeploy"
+    tmsUpload: true
+
+  steps:
+    artifactPrepareVersion:
+      versioningType: "cloud_noTag"
+
+  npmExecutionLint:
+    failOnError: true
+
+  cloudFoundryDeploy:
+    mtaDeployParameters: "-f --version-rule ALL"
+
+  tmsUpload:
+    nodeName: "STMS_DEV"
+    credentialsId: "tms-sk"
