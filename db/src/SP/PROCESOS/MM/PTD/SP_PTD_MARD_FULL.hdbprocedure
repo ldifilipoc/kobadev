@@ -1,0 +1,24 @@
+PROCEDURE "SP_PTD_MARD_FULL"()
+ LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+       Write your procedure logic 
+   *************************************/
+    
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+	
+	TRUNCATE TABLE STG_ABAP_MARD;
+	CALL SP_STG_MARD_LOAD_V001();
+	TRUNCATE TABLE FT_MARD;
+	CALL SP_FT_MARD_LOAD_V001();
+	merge delta of FT_MARD;
+	
+	--TRUNCATE TABLE STG_ABAP_MARC;
+	--CALL SP_STG_MARC_LOAD_V001(:pLFGJA,:pLFMON);
+	--CALL SP_FT_MARC_LOAD_V001(:pLFGJA,:pLFMON);
+	--merge delta of FT_MARC;
+	
+END

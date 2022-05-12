@@ -1,0 +1,67 @@
+PROCEDURE "SP_STG_ZTFI_DTS_IMP_LOAD_V001"()
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+	Carga del IVA, impoconsumo, costo unitario
+	Fecha de Creación:02/12/2019
+	Fecha de Modificación:11/02/2020
+	Creado por: CORG-JPIMIENTA
+	Modifica:CORG-JPIMIENTA
+	Motivo cambio: Manejo de Deltas
+	
+	Tabla Virtual usada:	VT_ABAP_ZTFI_DTS_IMP (IVA, Impoconsumo cargados del POS y costo unitario para el cálculo del costo por material)
+							
+	Las virtual table fueron creadas por el replication task para cargue inicial/full
+	Stage table: STG_ZTFI_DTS_IMP
+	Hecho destino: FT_COEP
+   *************************************/
+	Declare V_SQL NVARCHAR(500);
+	Declare pBELNR_DESDE VARCHAR(20);
+	Declare pBELNR_HASTA VARCHAR(20);
+	Declare Rango VARCHAR(200);
+	Declare pGJAHR VARCHAR(4);
+	Declare pBLART VARCHAR(2);
+	Declare M int=1;
+	Declare N int=0;
+	Declare pBUKRS VARCHAR(4) = '6A00';
+	
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+       
+	--Carga los rangos de documentos FI que estén pendientes por cargar de la tabla ZTFI_DTS_IMP
+	--Los documentos a cargar son ingresados en el proceso: SP_DIM_DOCFI_LOAD_V001
+	--EXTRACCION DE LA ZTFI_DTS_IMP
+	--SP_PTD_COEP_ZTPOS -> Este proceso es el que llama a SP_STG_ZTFI_DTS_IMP_LOAD_V001, tantas veces rangos de timestamp se carguen a la COEP
+	
+	M=0;
+	--Se extre el rango de documentos cargados para el IVA del POS que no han sido previamente cargados para cada clase de documento
+	select Count(BELNR_DESDE) into M
+	from "ETL_CONTROL_CARGUE" 
+	where TABLA='ZTFI_DTS_IMP' and BLART = 'I1' and CARGA_POS='P'; --Cargas o rangos de documento POS pendientes de ZTFI_DTS_IMP
+	--Si hay almenos un registro continua
+	
+	IF :M > 0 THEN 
+		select top 1 GJAHR,BLART,BELNR_DESDE,BELNR_HASTA BT into pGJAHR,pBLART,pBELNR_DESDE,pBELNR_HASTA
+		from "ETL_CONTROL_CARGUE" 
+		where TABLA='ZTFI_DTS_IMP' and BLART = 'I1' and CARGA_POS='P' --Cargas o rangos de documento POS pendientes de ZTFI_DTS_IMP
+		order by FECHA_CARGA,BELNR_DESDE;
+		
+		RANGO= 'WHERE BUKRS=''6A00'' AND GJAHR='''||:pGJAHR||''' AND BELNR>='''||:pBELNR_DESDE||''' AND BELNR<='''||:pBELNR_HASTA||'''';
+		--Se insertan los documentos recibidos del POS con el IVA, Impoconsumo y Costo unitario por material
+		V_SQL=	'insert into KOBA_HDI_DB_1.STG_ABAP_ZTFI_DTS_IMP(BUKRS,BELNR,GJAHR,BUZEI,WW010,WW011,WW012,WW013,DMBTR,PRCTR,CPUDT) '||
+				'SELECT BUKRS,BELNR,GJAHR,BUZEI,WW010,WW011,WW012,WW013,DMBTR,PRCTR,CPUDT '||
+				'FROM KOBA_HDI_DB_1.VT_ABAP_ZTFI_DTS_IMP '||:RANGO;
+		EXECUTE IMMEDIATE V_SQL;
+		commit;
+		
+		--El estado de carga CARGA_POS='P' lo cambia el proceso: SP_FT_COEP_LOAD_V002, para asegurar que solo cuando sea marcado como CARGA_POS='X'
+		--cuando el rango de documentos es cargado a la FT_COEP_ZTPOS
+		
+	ELSE
+		M=0;
+	END IF;
+
+   
+END

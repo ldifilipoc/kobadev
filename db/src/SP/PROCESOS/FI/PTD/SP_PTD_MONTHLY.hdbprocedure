@@ -1,0 +1,32 @@
+PROCEDURE "SP_PTD_MONTHLY"(pPER1 varchar(7))
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+       Cargue manual de la información del periodo
+   *************************************/
+    Declare pEmpresa smallint=28;
+    Declare Periodo varchar(7);
+    Declare pBUKRS_L VARCHAR(4)='6A0L';
+	Declare FECHA DATE;
+	Declare Reg integer;
+	
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+       
+    truncate table STG_0FI_GL_10;
+    commit;
+    CALL SP_STG_FIGL10_LOAD_V001(:pPER1);
+    commit;
+    
+    select count(*) into Reg from STG_0FI_GL_10;
+    IF :Reg>0 THEN
+	    Fecha= LAST_DAY(cast(substr(:pPER1,0,4)||substr(:pPER1,6,2)||'01' as date)); 
+	    DELETE FROM FT_FIGL WHERE CD_DW_EMPRESA = 28 AND FE_FISCPER = :Fecha;
+	    commit;
+	    
+	    CALL SP_FT_FIGL_LOAD_V001(:pPER1);
+	END IF;
+	
+END

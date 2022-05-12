@@ -1,0 +1,61 @@
+PROCEDURE "SP_PTD_COMPRA"()
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+      Cargue delta de las compras
+      Ejecutado por el proceso en CPI-DI de nombre: 6_P_COMPRA
+
+		Para la carga de datos vía tabla ABAP se requiere identificar primero que documentos cambian, es decir
+		Carga los cambios en documentos de compra en los ultimos x dias, en el ejemplo 1 día, por eso antes de correr este proceso debe ejecutar:
+		CALL "SP_STG_CDHDR_LOAD_V001"(1);
+      
+   *************************************/
+   
+ 	--Declaración de Cursores de fechas con rangos de consecutivos, periodos y particiones de compras a actualizar
+ 	
+ 	--Fechas y consecutivos que cambiaron
+	DECLARE CURSOR cursor_compras_modificadas FOR
+	SELECT DIM.FE_AEDAT,ETl.PERIODO,ETL.PART_ID, substring(DIM.CD_EBELN,1,5) Cons, Min(DIM.CD_EBELN) DESDE, Max(DIM.CD_EBELN) HASTA, Count(DIM.CD_EBELN) Cantidad
+	FROM STG_ABAP_CDHDR CDHDR
+	INNER JOIN DIM_COMPRA DIM ON DIM.CD_EBELN = CDHDR.OBJECTID
+	INNER JOIN ETL_PARTICIONES ETL 
+			ON ETL.PERIODO = TO_CHAR(DIM.FE_AEDAT,'YYYYMM')
+			AND ETL.TABLA = 'FT_COMPRA'
+	GROUP BY ETl.PERIODO,ETL.PART_ID,DIM.FE_AEDAT,substring(DIM.CD_EBELN,1,5);
+	
+	--Periodos que cambiaron
+	DECLARE CURSOR cursor_compras_modificadas_periodos FOR
+	SELECT ETl.PERIODO,ETL.PART_ID
+	FROM STG_ABAP_CDHDR CDHDR
+	INNER JOIN DIM_COMPRA DIM ON DIM.CD_EBELN = CDHDR.OBJECTID
+	INNER JOIN ETL_PARTICIONES ETL 
+			ON ETL.PERIODO = TO_CHAR(DIM.FE_AEDAT,'YYYYMM')
+			AND ETL.TABLA = 'FT_COMPRA'
+	GROUP BY ETl.PERIODO,ETL.PART_ID;
+	
+	--Inicio de los procesos de actualización
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+       
+	TRUNCATE TABLE STG_ABAP_EKPO;
+	TRUNCATE TABLE STG_ABAP_EKET;
+	TRUNCATE TABLE STG_ABAP_EKKO;
+	
+	--Carga de los encabezados de compra
+	CALL "SP_STG_EKKO_LOAD_V001"();
+	
+	--Para cada día donde se detectó una modificación (SP_STG_CDHDR_LOAD_V001) y cada rango de consecutivo se insertan los datos en las tablas de stage:
+	FOR cur_compra_modificada_row AS cursor_compras_modificadas DO	
+		"SP_STG_EKPO_LOAD_V003"('D',cur_compra_modificada_row.DESDE, cur_compra_modificada_row.HASTA);
+		"SP_STG_EKET_LOAD_V003"('D',cur_compra_modificada_row.DESDE, cur_compra_modificada_row.HASTA);
+	END FOR;
+	
+	--Para periodo que cambia se actualiza la FACT TABLE y el Inventario Recibido
+	FOR cur_compra_per_modificada_row AS cursor_compras_modificadas_periodos DO 
+		 "SP_FT_COMPRA_LOAD_EKPO"('D',cur_compra_per_modificada_row.PERIODO, cur_compra_per_modificada_row.PART_ID);
+		 "SP_FT_COMPRA_LOAD_EKET"('D',cur_compra_per_modificada_row.PERIODO, cur_compra_per_modificada_row.PART_ID);
+	END FOR;
+
+END

@@ -1,0 +1,53 @@
+PROCEDURE SP_STG_COBK_LOAD_V001()
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+	Carga de la Cabecera del Ingreso contabilizado del POS
+	Fecha de Creación:02/12/2019
+	Fecha de Modificación:11/02/2020
+	Creado por: CORG-JPIMIENTA
+	Modifica:CORG-JPIMIENTA
+	Motivo cambio:	Cambio en la obtención del timestamp de la COBK al de la COEP
+					Se toma el timestamp de la COEP por la dependencia de esta tabla en los procesos de carga de la COEP.
+	Tabla Virtual usada:	VT_ABAP_COBK (Encabezado documento CO, usado para traer la referencia del documento FI (El cual puede tener + de 1 doc. CO asociado)
+							
+	Las virtual table fueron creadas por el replication task para cargue inicial/full
+	Stage table: STG_COBK
+	Hecho destino: FT_COEP
+   *************************************/
+	Declare SociedadCO VARCHAR(4)='6100';
+	Declare V_SQL NVARCHAR(500);
+	Declare pTIMESTMP DECIMAL(15,0);
+	Declare N int;
+	Declare pEmpresa smallint = 28;
+	Declare pBUKRS VARCHAR(4) = '6A00';
+	
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+
+	truncate table STG_ABAP_COBK;
+	
+	--EXTRACCION DE LA COBK
+	--Ultimo Timestamp ingresado en la COBK
+	select Max(TIMESTMP_HASTA) into pTIMESTMP from "ETL_CONTROL_CARGUE" where TABLA='FT_COEP' and BUKRS=:pBUKRS; 
+	--Se insertan las cabeceras de los nuevos documentos CO
+	V_SQL=	'insert into KOBA_HDI_DB_1.STG_ABAP_COBK(KOKRS,BELNR,TIMESTMP,BLDAT,BUDAT,USNAM,BLTXT,STFLG,STOKZ,REFBN,REFGJ,BLART,KURST,KWAER) '||
+			'SELECT KOKRS,BELNR,TIMESTMP,BLDAT,BUDAT,USNAM,BLTXT,STFLG,STOKZ,REFBN,REFGJ,BLART,KURST,KWAER '||
+			'FROM KOBA_HDI_DB_1.VT_ABAP_COBK '||
+			'WHERE TIMESTMP>'||pTIMESTMP||' AND KOKRS='''||:SociedadCO||'''';
+	EXECUTE IMMEDIATE :V_SQL;
+	COMMIT;
+	
+	select ifnull(Count(*),0) into N from STG_ABAP_COBK where TIMESTMP>:pTIMESTMP;
+	IF :N>0 THEN
+		--Se actualiza el lote cargado para la COBK
+		insert into ETL_CONTROL_CARGUE(TABLA,FECHA_CARGA,BUKRS,GJAHR,BELNR_DESDE,BELNR_HASTA,TIMESTMP_DESDE,TIMESTMP_HASTA,ULTIMA_FECHA,REGISTROS_PROCESADOS)
+		select 'COBK',now(),:pBUKRS,substr(Max(BUDAT),0,4),Min(BELNR),Max(BELNR),Min(TIMESTMP),Max(TIMESTMP),Max(BUDAT),Count(BELNR)
+		from "STG_ABAP_COBK"
+		where TIMESTMP>:pTIMESTMP;
+		COMMIT;
+	END IF;
+	
+END

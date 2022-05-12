@@ -1,0 +1,26 @@
+PROCEDURE "SP_RPT_CALCULAR_PORCENTAJE_DISTR"(periodo DATE)
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+       Write your procedure logic 
+   *************************************/
+   
+   Declare net_sales DECIMAL(18,3);
+   
+   DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+     
+    SELECT ROUND (SUM(SALDO), 2) into net_sales
+	FROM KOBA_MONTHLY_V001
+	WHERE CONCEPTO_KPI IN ('KPI0111', 'KPI0112') AND MES=:periodo;
+	
+	SELECT MES, REGIONAL, STORE, ACTIVIDAD, SUM(SALDO) , :net_sales, SUM(SALDO)/:net_sales as PORCENTAJE 
+	FROM KOBA_MONTHLY_V001
+	WHERE CONCEPTO_KPI IN ('KPI0111', 'KPI0112') AND MES=:periodo 
+	GROUP BY MES, REGIONAL, STORE, ACTIVIDAD;
+	
+	
+
+END

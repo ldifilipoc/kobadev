@@ -1,0 +1,133 @@
+{
+  "role": {
+    "name": "Z_ROLE_K_PORTAL",
+    "object_privileges": [
+      {
+        "name": "VW_ESTADO_MATERIAL",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "VW_COMPRA_INVENTARIO",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "KOBA_COMPRA_VIEW",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "KOBA_CONSOLIDADO_COMPRA_VIEW",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "KOBA_CONSOLIDADO_VENTA_VIEW",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "VW_KOBA_HISTORIAL_PEDIDO_CLASE_DOC",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "VW_MOVIMIENTO_HISTORICO",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "SP_RPT_VENTAS_LFL",
+        "type": "PROCEDURE",
+        "privileges": [
+          "EXECUTE"
+        ]
+      },
+      {
+        "name": "SP_RPT_VENTAS_LFL_PRODUCTO",
+        "type": "PROCEDURE",
+        "privileges": [
+          "EXECUTE"
+        ]
+      },
+      {
+        "name": "FT_COMPRA",
+        "type": "TABLE",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "FT_0FIAP4",
+        "type": "TABLE",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "DIM_COMPRA",
+        "type": "TABLE",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "DIM_MATERIAL",
+        "type": "TABLE",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "DIM_BPARTNER",
+        "type": "TABLE",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "FT_MARDH",
+        "type": "TABLE",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "STG_ABAP_ZTMM_ZESTADOART",
+        "type": "TABLE",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "KOBA_CONSOLIDADO_DOC_COMPENSADO_VIEW",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "DIM_CEBE_CLIENTE",
+        "type": "TABLE",
+        "privileges": [
+          "SELECT"
+        ]
+      }
+    ]
+  }
+}

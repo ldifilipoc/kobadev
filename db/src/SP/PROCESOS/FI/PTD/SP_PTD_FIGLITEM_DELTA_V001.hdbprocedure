@@ -1,0 +1,55 @@
+PROCEDURE "SP_PTD_FIGLITEM_DELTA_V001"()
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+   PTD: Proceso de transferencia de datos
+	Carga de partidas individuales en modo delta (desde la ultima fecha/hora de carga)
+	Fecha de Creación:02/12/2019
+	Fecha de Modificación:11/02/2020
+	Creado por: CORG-JPIMIENTA
+	Modifica:CORG-JPIMIENTA
+	Motivo cambio:  Manejo de Deltas
+					La zona horaria del servidor de HANA coincide con la del usuario en SAP configurado para hacer la extracción y con la del usuario usado por el POS para el timestamp con que se almacenan las partidas individuales en el ERP.
+	Stage table:  STG_ABAP_FAGLFLEXA
+	Hecho destino: FT_FIGLITEM
+   *************************************/
+	Declare pFechaHoraHasta datetime;
+	Declare pFechaHoraDesde datetime;
+	Declare pFechaMax datetime;				--Fecha límite de carga full
+	Declare pTIMESTMP_HASTA varchar(15);	--TimeStamp límite de carga del lote
+	Declare pTipoCarga Varchar(1)='D';
+	Declare pEmpresa smallint =28;
+	Declare pBUKRS VARCHAR(4) = '6A00';
+	
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+      
+	pFechaMax = add_seconds(Now(),3600*6); --El cargue se realiza en rangos de cada 1 horas para evitar desbordamientos hasta la Fecha/Hora Actual+ 6 horas, ya que el timestamp del FAGLFLEXA está adelantado 5 horas respecto al encabezado
+ 	select TO_TIMESTAMP(Max(TIMESTMP_HASTA),'YYYYMMDDHH24MISS') into pFechaHoraHasta  --Ultima fecha/hora de cargue desde el cual se lanza el proceso
+	from "ETL_CONTROL_CARGUE" 
+	where TABLA='FT_FIGLITEM' and BUKRS=:pBUKRS AND TIPO_CARGA=:pTipoCarga;
+	pFechaHoraDesde = add_seconds(:pFechaHoraHasta,1);
+	
+    while :pFechaHoraHasta<=:pFechaMax do
+    
+    	truncate table STG_ABAP_FAGLFLEXA;
+
+    	--Se carga en lotes de 30 min porque por la cantidad de registros el ERP puede devolver error
+    	pFechaHoraHasta = add_seconds(:pFechaHoraHasta,1800); --Ultimo día:hora:min:seg cargado + 1 horas
+
+		--01. Carga de Partidas individuales de Finanzas, requeridas para extraer el centro de beneficio que le corresponde a cada movimiento del POS
+		CALL SP_STG_FAGLFLEXA_LOAD_V001(:pTipoCarga,:pFechaHoraDesde,:pFechaHoraHasta);
+		--02. Carga Final de Partidas individuales de finanzas a la FACT TABLE
+		CALL SP_FT_FIGLITEM_LOAD_V001(:pTipoCarga);
+		
+		--Se obtiene la ultima fecha/hora de cargue vía delta en la FACT TABLE para asegurar que no queden fecha/hora por fuera
+	 	select TO_TIMESTAMP(Max(TIMESTMP_HASTA),'YYYYMMDDHH24MISS') into pFechaHoraDesde  --Ultima fecha/hora de cargue desde el cual se lanza el proceso
+		from "ETL_CONTROL_CARGUE" 
+		where TABLA='FT_FIGLITEM' and BUKRS=:pBUKRS AND TIPO_CARGA=:pTipoCarga;
+		pFechaHoraDesde = add_seconds(:pFechaHoraDesde,1); --Ultimo día:hora:min:seg cargado + 1 segundo, para enviar volver a cargar un registro
+
+	end while;
+	
+END

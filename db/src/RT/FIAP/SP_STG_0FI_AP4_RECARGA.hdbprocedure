@@ -1,0 +1,28 @@
+PROCEDURE "SP_STG_0FI_AP4_RECARGA"(fh_desde DATE, fh_hasta DATE )
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   --DEFAULT SCHEMA <default_schema_name>
+   AS
+BEGIN
+
+	Declare i int=0;
+	Declare pDias int = days_between(:fh_desde,:fh_hasta)+1;
+	Declare pFecha date = :fh_desde;
+	
+	FOR i IN 1..:pdias DO
+		
+		INSERT INTO STG_0FI_AP4 ("BUKRS" ,"FISCPER" ,"BELNR" ,"BUZEI" ,"STATUSPS","LIFNR","BLART","BLDAT","BUDAT" ,"CPUDT","AUGDT","NETDT" ,"ZFBDT","ZBD1T" ,"ZTERM"
+		,"ZLSPR","LCURR","DMSOL","DMHAB","DMSHB" ,"WAERS" ,"WRSOL","WRHAB","WRSHB","HKONT","SAKNR" ,"AUGBL","XBLNR","REBZG","REBZJ","VBELN","XREF1","XREF2","XREF3","SGTXT","ZUONR",
+		"DMBTR","GJAHR","MONAT","SHKZG","WRBTR","ZZGSBER") 
+		SELECT "BUKRS" ,"FISCPER" ,"BELNR" ,"BUZEI" ,"STATUSPS","LIFNR","BLART","BLDAT","BUDAT" ,"CPUDT","AUGDT","NETDT" ,"ZFBDT","ZBD1T" ,"ZTERM"
+		,"ZLSPR","LCURR","DMSOL","DMHAB","DMSHB" ,"WAERS" ,"WRSOL","WRHAB","WRSHB","HKONT","SAKNR" ,"AUGBL","XBLNR","REBZG","REBZJ","VBELN","XREF1","XREF2","XREF3","SGTXT","ZUONR",
+		"DMBTR","GJAHR","MONAT","SHKZG","WRBTR","ZZGSBER"
+		FROM VT_0FI_AP4 
+		WHERE CPUDT = :pFecha;
+		
+		pFecha = add_days(:pfecha,1);
+		i = :i + 1;
+	
+	END FOR;
+
+END

@@ -1,0 +1,8 @@
+PROCEDURE "SP_FT_FIAP4_LOAD_V001" ()
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+
+/*Se retira el código para este proceso y se pasa al SP_PTD_FIAP4_V002*/
+END

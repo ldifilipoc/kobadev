@@ -1,0 +1,49 @@
+{
+  "role": {
+    "name": "Z_ROLE_K_FI_IMPUESTOS",
+    "object_privileges": [
+      {
+        "name": "KOBA_REPORTE_ICA",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "KOBA_REPORTE_ICA_NO_OPERACIONAL",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "KOBA_REPORTE_ICA_CONTABILIDAD",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "KOBA_REPORTE_ICA_DIFERENCIAS",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "KOBA_REPORTE_ICA_INGRESOS_SIN_CEBE",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "KOBA_REPORTE_SALESBYITEM_FECHA",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      }
+    ]
+  }
+}

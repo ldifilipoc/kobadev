@@ -1,0 +1,56 @@
+COLUMN TABLE "FT_0FIAP4"(
+	"CD_DW_EMPRESA" SMALLINT, 			  -- BUKRS SOCIEDAD
+	"FE_FISCPER" DATE ,		  -- FISCPER PERIODO FISCAL
+	"CD_BELNR" NVARCHAR(10) NOT NULL,	  -- BELNR NUMERO DOCUMENTO 
+	"CD_BUZEI" VARCHAR(3) NOT NULL,		  -- BUZEI ITEM
+	"FL_STATUSPS" NVARCHAR(1),			  -- STATUSPS ESTADO ITEM
+	"CD_DW_LIFNR" INT,                    -- LIFNR VENDEDOR
+	"CD_BLART" NVARCHAR(2), 			  -- BLART TIPO DE DOCUMENTO
+	"CD_BLDAT" VARCHAR(8),				  -- BLDAT FECHA DEL DOCUMENTO
+	"FE_BUDAT" VARCHAR(8),				  -- BUDAT FECHA DE CONTABILIZACION
+	"FE_CPUDT" VARCHAR(8),				  -- CPUDT FECHA DE REGISTRO
+	"FE_AUGDT" VARCHAR(8),				  -- AUGDT FECHA DE COMPENSACION
+	"FE_NETDT" VARCHAR(8),				  -- NETDT Fecha neta de vencimiento
+	"FE_ZFBDT" VARCHAR(8),				  -- ZFBDT FECHA BASE DE VENCIMIENTO
+	"CD_ZTERM" NVARCHAR(4),				  -- ZTERM Términos de la clave de pago
+	"CD_LCURR" NVARCHAR(5),				  -- LCURR Moneda local
+	"VL_DMSOL" DECIMAL(13, 2) ,	  -- Monto de débito en moneda local
+	"VL_DMHAB" DECIMAL(13, 2) ,	  -- Monto de crédito en moneda local
+	"VL_DMSHB" DECIMAL(13, 2) ,   -- DMSHB cantidad en moneda local *
+	"CD_MONEDA" NVARCHAR(5),			  -- WEARS Documento moneda
+	"CD_DW_CUENTA" SMALLINT,        -- HKONT Número de cuenta 
+	"CD_SAKNR" NVARCHAR(10),    		  -- SAKNR Número de cuenta
+	"CD_AUGBL" NVARCHAR(10),			  -- AUGBL DOCUMENTO DE COMPENSACION
+	"CD_XBLNR" NVARCHAR(16),			  -- XBLNR Número de documento de referencia
+	"CD_REBZG" NVARCHAR(10),			  -- REBZG Número de factura
+	"CD_REBZJ" VARCHAR(4),				  -- REBZJ Año de factura
+	"CD_VBELN" NVARCHAR(10),              -- VBELN Documento de ventas
+	"CD_XREF1" NVARCHAR(12),              -- XREF1 REFERENCIA 1
+	"CD_XREF2" NVARCHAR(12),              -- XREF2 REFERENCIA 2
+	"CD_XREF3" NVARCHAR(20),              -- XREF3 REFERENCIA 3
+	"CD_SGTXT" NVARCHAR(50),			  -- Descripción larga
+	"CD_ZUONR" NVARCHAR(18),			  -- ZUONR 
+	"VL_DMBTR" DECIMAL(13, 2) ,	  -- Importe en moneda local 
+	"CD_EJERCICIO" VARCHAR(4),			  -- GJAHR 
+	"CD_MES" VARCHAR(2),				  -- MONAT
+	"FL_SHKZG" NVARCHAR(1),				  -- SHKZG IND DEBE/HABER
+	"VL_WRBTR" DECIMAL(13, 2) ,   -- Importe en la moneda del documento 
+	"CD_ZZGSBER" NVARCHAR(4),
+	"FL_ZLSPR" NVARCHAR(1),				  -- Bloqueo
+	PRIMARY KEY (
+		"CD_DW_EMPRESA",
+		"FE_FISCPER",
+		"CD_BELNR",
+		"CD_BUZEI",
+		"FL_STATUSPS"
+	)
+)
+UNLOAD PRIORITY 5 AUTO MERGE
+	PARTITION BY RANGE (YEAR("FE_FISCPER"))(
+		PARTITION '2010' <= VALUES < '2019',
+		PARTITION VALUE = '2019',
+		PARTITION VALUE = '2020',
+		PARTITION VALUE = '2021',
+		PARTITION VALUE = '2022',
+		PARTITION VALUE = '2023'
+	);

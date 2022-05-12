@@ -1,0 +1,8 @@
+PROCEDURE "SP_STG_FIAP4_LOAD_V001"()
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+	--Se retira el scrip de carga separada del stage y se pasa al proceso 
+	--SP_FT_FIAP4_LOAD_V001
+END

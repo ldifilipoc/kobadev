@@ -1,0 +1,23 @@
+PROCEDURE "SP_DIM_IMPUESTO_LOAD"()
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+       
+  /*************************************
+       Tasas de impuestos para revisión de la tasa aplicada por périda de punto decimal en notas crédito
+       Agregado el 25/02/2020 
+       
+   *************************************/	
+    KONP=select KNUMH,KBETR from VT_ABAP_KONP where KBETR<>0 AND KBETR<>990;
+    A003=select MWSKZ,KNUMH from VT_ABAP_A003 where ALAND='CO';
+    
+	insert into "DIM_IMPUESTO"("IMPUESTO_CODIGO","IMPUESTO_TASA")
+	select MWSKZ,KBETR/1000
+	from (	select row_number() Over (partition by A.MWSKZ order by K.KNUMH desc) ID, A.MWSKZ,K.KBETR
+			from :KONP K inner join :A003 A on K.KNUMH = A.KNUMH) Det
+	where Det."ID"=1 and not MWSKZ in (select IMPUESTO_CODIGO from DIM_IMPUESTO);
+
+END

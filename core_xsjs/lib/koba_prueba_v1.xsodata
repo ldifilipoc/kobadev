@@ -1,0 +1,1 @@
+service{"KOBA_ACTIVO_PRUEBA" keys("CD_DW_ANLA");}

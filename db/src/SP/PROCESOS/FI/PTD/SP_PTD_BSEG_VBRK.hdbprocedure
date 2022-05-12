@@ -1,0 +1,87 @@
+PROCEDURE "SP_PTD_BSEG_VBRK"()
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+   PTD: Proceso de transferencia de datos
+	Carga de Ingresos facturados por SD por material en modo delta (desde la ultima fecha/hora de carga)
+	El extractor estándar 0FI_GL_14 no tiene el MATNR como parte de los campos de extracción
+	
+	Fecha de Creación:02/12/2019
+	Creado por: CORG
+	Modifica:CORG
+	Motivo cambio:	
+					
+	Stage table:  STG_ABAP_BSEG
+	Hecho destino: FT_BSEG_VBRK
+	Agendamiento de carga: En SAP CPI-DI, Proceso 2_P_FINANZAS 
+   *************************************/
+	Declare i int=0;
+	Declare M bigint=0;
+	Declare pBELNR_DESDE varchar(12);
+	Declare pBELNR_HASTA varchar(12);
+	Declare pGJAHR Varchar(4);
+	Declare pFECHA_CARGA Datetime;
+	Declare pTabla VARCHAR(50)= 'BSEG_VBRK';
+	Declare pReg bigint = 0;
+	Declare pBLART varchar(2) = 'RV';
+	
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+       
+	--Cantidad de Cargas o rangos de documento POS pendientes
+	select count(BELNR_DESDE) Registro
+	into  pReg
+	from ETL_CONTROL_CARGUE 
+	where TABLA    = :pTabla
+	  and BLART    = :pBLART
+	  and CARGA_POS='P';
+	  
+	FOR i IN 1..:pReg DO
+			
+		select top 1 FECHA_CARGA, GJAHR, BELNR_DESDE,BELNR_HASTA 
+		into pFECHA_CARGA, pGJAHR,pBELNR_DESDE,pBELNR_HASTA
+		from ETL_CONTROL_CARGUE 
+		where TABLA    = :pTabla
+		  and BLART    = :pBLART
+		  and CARGA_POS='P' --Cargas o rangos de documento POS pendientes
+		order by  FECHA_CARGA, BELNR_DESDE;
+		
+		--limpieza de las tablas de stage
+		truncate table STG_ABAP_BSEG;
+		--Procesa/carga para cada rango de documentos FI y clase de documento 	
+		--CALL SP_STG_BSEG_LOAD_V001(pGJAHR, pBELNR_DESDE,pBELNR_HASTA);
+
+		select sum(Cantidad)
+		into  M
+		from (
+		select	count(F.BELNR) Cantidad
+		from STG_ABAP_BSEG F 
+		inner join DIM_DOCFI B 
+				on B.CD_BELNR		=F.BELNR 
+				AND B.CD_EJERCICIO	=F.GJAHR 
+				AND B.CD_DW_EMPRESA	=28
+		where CO_ITEMS<1
+		group by B.CD_EJERCICIO
+		union 
+		select 0 Cantidad
+		from TDUMMY
+		) Det;
+		
+		--Se actualizan los datos de ingresos facturados por SD
+		CALL SP_FT_BSEG_VBRK_LOAD;
+
+		update ETL_CONTROL_CARGUE 
+		set CARGA_POS='X',
+			REGISTROS_PROCESADOS=:M
+		where TABLA=:pTabla
+		AND GJAHR=:pGJAHR 
+		AND BLART=:pBLART 
+		AND FECHA_CARGA = :pFECHA_CARGA;
+		commit;
+		i = :i + 1;
+		
+	END FOR;
+
+END

@@ -1,0 +1,70 @@
+PROCEDURE "SP_PTD_FIGLITEM_FULL_V001"(pFDesde Date, pFHasta DATE, IncluirBKPF Varchar(1), IntervaloHoras INT)
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+   PTD: Proceso de transferencia de datos
+	Carga de partidas individuales en modo full (rango de fecha/hora de carga pFDesde-pFHasta)
+	Fecha de Creación:02/12/2019
+	Creado por: CORG-JPIMIENTA
+	Modifica:CORG-JPIMIENTA
+	Motivo cambio: 11/02/2020	Cambio de nombre
+	
+	Stage table:  STG_FAGLFLEXA
+	Hecho destino: FT_FIGLITEM
+	
+	Ejemplo para el llamado de este proceso:
+	S = Para incluir el encabezado de documentos financieros
+	N = Si previamente se han cargado los documentos financieros
+	6 = Cantidad de horas a cargar en cada lote
+	CALL DWH_HDI_DB_1."SP_PTD_FIGLITEM_FULL_V001"('20200405','20200405','S',6);
+	
+   *************************************/
+   
+	Declare pEmpresa smallint = 28;
+	Declare pFechaHoraDesde datetime;
+	Declare pFechaHoraMaximo datetime;	--Fecha límite de carga full
+	Declare pFechaHoraHasta datetime;	--TimeStamp límite de carga del lote
+	Declare pTipoCarga Varchar(1)='F';
+	Declare pBUKRS VARCHAR(4) = '6A00';
+	
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+       
+	IF IncluirBKPF ='S' THEN
+    	CALL SP_DIM_DOCFI_LOAD_V001('F',:pFDesde,:pFHasta);
+    END IF;
+    
+ 	--Rango Fecha/Hora a cargar, inicia el time en 0
+	pFechaHoraDesde = :pFDesde;   
+    --ultima hora:mi:ss del día máximo o límite a cargar: FECHA+23:59:59 + 6 horas por la diferencia horaria
+    pFechaHoraMaximo = add_seconds(:pFHasta,86400+3600*6);
+ 
+    --PASO 2: Cargar en rangos de cada 6 horas porque por la cantidad de registros el ERP puede devolver error
+    while :pFechaHoraDesde<=:pFechaHoraMaximo do
+    
+    	--PASO 3: Se calcula la fecha/hora límite del lote a cargar
+    	pFechaHoraHasta = add_seconds(:pFechaHoraDesde,3600*:IntervaloHoras); --Ultimo día:hora:min:seg cargado + 2 hora
+    	--PASO 4: Se limpia la tabla temporal de carga    	
+	   	truncate table STG_ABAP_FAGLFLEXA;
+	   	
+		--PASO 5. Carga de Partidas individuales de Finanzas, requeridas para extraer el centro de beneficio que le corresponde a cada movimiento del POS
+		CALL SP_STG_FAGLFLEXA_LOAD_V001(:pTipoCarga,:pFechaHoraDesde,:pFechaHoraHasta);
+		--PASO 6. Carga Final de Partidas individuales de finanzas a la FACT TABLE
+		CALL SP_FT_FIGLITEM_LOAD_V001(:pTipoCarga);
+		--El proceso continua hasta que se llegue a la fecha final del rango a cargar
+		--Tener en cuenta que en cada iteración el lote de carga obtiene los datos del ERP desde la fecha/hora 'HASTA' 
+		--de la iteración anterior y que es el devuelto por la tabla de ETL_CONTROL_CARGUE dentro del proceso SP_STG_FIGLITEM_LOAD_V001
+		pFechaHoraDesde = add_seconds(:pFechaHoraDesde,3600*:IntervaloHoras); --Ultimo día:hora:min:seg cargado + 1 hora
+
+	end while;
+	
+	--Se inserta el ultimo timestamp ingresado para no dañar la carga delta. En caso de que el cargue full actualice registros hasta la fecha actual, este paso hacer que el delta cargue apartir del ultimo timestamp ingresado.
+	insert into "ETL_CONTROL_CARGUE"("TABLA","FECHA_CARGA","ULTIMA_FECHA","BUKRS","GJAHR","BLART","BELNR_DESDE","BELNR_HASTA","TIPO_CARGA","REGISTROS_PROCESADOS","TIMESTMP_DESDE","TIMESTMP_HASTA")
+	select "TABLA",Now(),Max("ULTIMA_FECHA"),"BUKRS",'','','','','D',0,0,Max("TIMESTMP_HASTA")
+	from "ETL_CONTROL_CARGUE"
+	where TABLA='FT_FIGLITEM' 
+	group by "TABLA","BUKRS";
+	
+END

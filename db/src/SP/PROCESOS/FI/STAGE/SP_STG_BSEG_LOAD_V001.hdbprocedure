@@ -1,0 +1,34 @@
+PROCEDURE "SP_STG_BSEG_LOAD_V001"(pGJAHR VARCHAR(4), pBELNR_DESDE VARCHAR(10), pBELNR_HASTA VARCHAR(10))
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+	Carga datos requeridos de la BSEG 
+	Fecha de Creación:27/11/2020
+	Fecha de Modificación:05/11/2020
+	Creado por: CORG
+	Modifica:CORG
+	Motivo cambio: Manejo de Deltas
+	
+	Tabla Virtual usada:	VT_ABAP_BSEG
+							
+	Las virtual table fueron creadas por el replication task para cargue inicial/full
+	Stage table: STG_ABAP_BSEG
+	Hecho destino: FT_BSEG_VBRK, DIM_DOCFI
+   *************************************/
+	Declare V_SQL NVARCHAR(500);
+	Declare Rango VARCHAR(200);
+	Declare pBUKRS VARCHAR(4)='6A00';
+
+	--DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    --   SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+       
+    V_SQL = 'INSERT INTO KOBA_HDI_DB_1.STG_ABAP_BSEG(BUKRS,BELNR,GJAHR,BUZEI,PRCTR,KOSTL,BSCHL,XREF1,XREF2,XREF3,SGTXT,ZUONR,VBELN,WERKS,MATNR,HKONT,KSTAR,MENGE,SHKZG,DMBTR,MWSKZ) '||
+			'SELECT BUKRS,BELNR,GJAHR,(CASE WHEN DOCLN='''' THEN BUZEI ELSE DOCLN END) BUZEI,PRCTR,KOSTL,BSCHL,XREF1,XREF2,XREF3,SGTXT,ZUONR,VBELN,WERKS,MATNR,HKONT,KSTAR,MENGE,SHKZG,DMBTR,MWSKZ '||
+			'FROM KOBA_HDI_DB_1.VT_ABAP_BSEG WHERE GJAHR='''||:pGJAHR||''' AND BUKRS='''||:pBUKRS||''' AND BELNR>='''||:pBELNR_DESDE||''' AND BELNR<='''||:pBELNR_HASTA||'''';
+	EXECUTE IMMEDIATE V_SQL;
+	COMMIT;   
+	     
+
+END

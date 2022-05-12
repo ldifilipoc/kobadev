@@ -1,0 +1,59 @@
+PROCEDURE "SP_DIM_CEBE_CLIENTE_LOAD"( )
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+
+   /*************************************
+   RELACIÓN CENTROS DE BENEFICIO - CLIENTE
+   Llave: Cliente, Cebe, Fecha fin validez
+   Cuando se cambia la fecha de validez de un registro, 
+   se inserta uno nuevo con la fecha de validez del registro anterior y se actualiza con los datos del vigente
+   *************************************/
+   
+	--DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    --   SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+       
+	call "RT_ZTFI_DTS_TIENDAS.START_REPLICATION";
+	
+	--Registro repetido que genera problemas por mala digitación
+	delete from "STG_ABAP_ZTFI_DTS_TIENDAS" 
+	where KUNNR='0000011556' and PRCTR='6A10T00122' and DATBI='99991231';
+
+	--Se actualiza los datos de tienda que están asociados al cliente
+	merge into DIM_CEBE_PRCTR B
+	using ( select "PRCTR","KUNNR","ZCTDA","KTEXT","KOSTL","WERKS","ZNAMC","GSBER","LGORT","NAME1","WW005","WW007","WW008","DATFA"
+			from (
+			select row_number() over (partition by "PRCTR" order by "PRCTR") ID ,"KUNNR","DATAB","DATBI","ZCTDA","PRCTR","KTEXT","KOSTL","WERKS","ZNAMC","GSBER","LGORT","NAME1","WW005","WW007","WW008","DATFA"
+			from "STG_ABAP_ZTFI_DTS_TIENDAS"
+			where DATBI='99991231' AND substr(PRCTR,7,4)=LGORT) det --Se valida que el codigo del PRCTR sea el mismo que el del almacén
+			where ID=1) T
+		ON B.CD_CEBE=T.PRCTR
+	WHEN MATCHED
+	THEN UPDATE SET B."CD_CLIENTE"=T.KUNNR,B."CD_KUNNR"=T.KUNNR, B."NM_CLIENTE"=T.KTEXT,
+				B.DPTO_007=T.WW007,B.DPTO_008 = T.WW008,B.FE_ZFI_TIENDAS =T.DATFA,
+				B.CD_ZCTDA=T.ZCTDA,B.CD_WERKS=T.WERKS,B.NM_ZONA=T.ZNAMC, B.CD_LGORT=T.LGORT, 
+				B.CD_WW005= T.WW005; --WW005 1=Administrativo, 2=CEDI, 3=Tiendas
+
+	commit;
+
+	ZTFI = 	select	row_number() over (partition by PRCTR,KUNNR,DATBI order by PRCTR,KUNNR,DATBI desc) ID, --Para asegurar que solo devuelva un registro por llave
+					CD_DW_CEBE,cast("KUNNR" as int) KUNNR,cast("DATAB" as date) DATAB,cast("DATBI" as date) DATBI,"ZCTDA","PRCTR","KTEXT","KOSTL","WERKS","ZNAMC","GSBER","LGORT","NAME1",cast("WW005"  as smallint) WW005,"WW007","WW008","DATFA"
+			from "STG_ABAP_ZTFI_DTS_TIENDAS" 
+			inner join DIM_CEBE_PRCTR on CD_CEBE="PRCTR"
+			where substr(PRCTR,7,4)=LGORT;
+	
+	truncate table DIM_CEBE_CLIENTE;
+	
+	merge into DIM_CEBE_CLIENTE B
+	using :ZTFI T ON B.CD_DW_CEBE=T.CD_DW_CEBE AND B.CD_KUNNR = T.KUNNR AND B.FE_HASTA = T.DATBI
+	WHEN MATCHED AND T."ID"=1
+	THEN UPDATE SET B."FE_DESDE"=T.DATAB,B."FE_HASTA"= T.DATBI,B."CD_ZCTDA"= T.ZCTDA,B."NM_TIENDA"=T.KTEXT,B.CD_CECO =T.KOSTL,B.CD_CENTRO=T.WERKS,
+					B."NM_ZONA"=T.ZNAMC,B."CD_DIVISION"=T.GSBER,B."CD_ALMACEN"=T.LGORT,B."NM_RESPONSABLE"= T.NAME1,B."DPTO1"=T.WW007,B."DPTO2"=T.WW008,B."FE_DATFA"=T.DATFA
+	WHEN NOT MATCHED AND T."ID"=1 THEN INSERT (CD_DW_CEBE,"CD_PRCTR","CD_KUNNR","FE_DESDE","FE_HASTA","CD_ZCTDA","NM_TIENDA","CD_CECO","CD_CENTRO","NM_ZONA","CD_DIVISION","CD_ALMACEN","NM_RESPONSABLE","DPTO1","DPTO2","FE_DATFA","TIPO_CEBE")
+	VALUES	(T.CD_DW_CEBE, T.PRCTR,T.KUNNR, T.DATAB, T.DATBI, T.ZCTDA, T.KTEXT, T.KOSTL, T.WERKS, T.ZNAMC, T.GSBER, T.LGORT, T.NAME1,T.WW007, T.WW008, T.DATFA,
+			(CASE WW005 WHEN 1 THEN 'A' WHEN 2 THEN 'C' ELSE 'T' END));
+	commit;
+
+	
+END

@@ -1,0 +1,57 @@
+PROCEDURE SP_DIM_CUENTA_LOAD( )
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;	
+   /*************************************
+       Maestro de Cuentas
+       Filtros: 
+       LANGU='S' AND KTOPL='PUCV'
+   *************************************/
+   --Se replican los datos del ERP a la Stage
+   call "RT_0GL_ACCOUNT.START_REPLICATION";
+   call "RT_0GL_ACCOUNT_ATTR.START_REPLICATION";
+   
+	--Creación de nuevas cuentas
+	--Las agrupaciones de Clase cuenta son estándar para Colombia
+	insert into DIM_CUENTA(CD_CUENTA,NM_CUENTA,CD_TIPO_CUENTA,CD_CLASE, NM_CLASE, CD_GRUPOCUENTA,CD_CONCEPTO,NM_CONCEPTO,TIPO_INFORME)
+	select	C.CD_CUENTA, 
+			C.NM_CUENTA,
+			(case substr(C.CD_CUENTA,1,1) when '1' then 'AST' 
+			when '2' then 'LEQ' when '3' then 'LEQ' when '4' then 'INC' when '5' then 'EXP' when '6' then 'EXP' when '7' then 'EXP'
+			else 'NFI' end) CD_TIPO_CUENTA,
+			substr(C.CD_CUENTA,0,1) CD_CLASE, 
+			(CASE substr(C.CD_CUENTA,0,1) 
+				WHEN '1' THEN 'ACTIVO' 
+				WHEN '2' THEN 'PASIVO' 
+				WHEN '3' THEN 'PATRIMONIO' 
+				WHEN '4' THEN 'INGRESO' 
+				WHEN '5' THEN 'GASTO' 
+				WHEN '6' THEN 'COSTO'
+			END) CD_GRUPOCUENTA, 
+			substr(C.CD_CUENTA,0,2) CD_GRUPOCUENTA,
+			'N.A' CD_CONCEPTO,
+			'N.A' NM_CONCEPTO,
+			(case when substr(C.CD_CUENTA,1,1) IN ('1','2','3') then 'B' else 'P' end) TIPO_INFORME
+	from STG_CUENTA C
+	left join DIM_CUENTA DIM ON 
+		DIM.CD_CUENTA = C.CD_CUENTA
+	where DIM.CD_DW_CUENTA IS NULL;	--cuentas nuevas
+	COMMIT;
+
+	MERGE INTO DIM_CUENTA CTA 
+	USING STG_0GL_ACCOUNT_ATTR STG
+		ON CTA.CD_CUENTA = STG.SAKNR
+	WHEN MATCHED AND CD_CONSOLIDACION != STG.BILKT THEN 
+	UPDATE SET CD_CONSOLIDACION = STG.BILKT;
+	COMMIT;
+	
+	insert into ETL_CONTROL_CARGUE(TABLA,FECHA_CARGA,BUKRS,GJAHR,BELNR_DESDE,BELNR_HASTA,TIMESTMP_DESDE,TIMESTMP_HASTA,ULTIMA_FECHA,REGISTROS_PROCESADOS)
+	select 'DIM_CUENTA',now(),'0000',Year(Now()),'','',0,0,Now(),Count(CD_CUENTA)
+	from STG_CUENTA C;
+	COMMIT;	
+	
+	truncate table STG_CUENTA;
+END

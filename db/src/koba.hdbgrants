@@ -1,0 +1,40 @@
+{
+    "koba-schema": {
+        "object_owner": {
+            "roles": [
+                "KOBA_GRANTOR_ROLE","CONTENT_ADMIN","koba::external_access_g"
+            ]
+        },
+        "application_user": {
+            "roles": [
+                "koba::external_access"
+            ],
+            "global_object_privileges": [{
+				"name":"KBP_SAPR3",
+				"type":"REMOTE SOURCE",
+				"privileges":[
+					"CREATE VIRTUAL TABLE", 
+					"CREATE REMOTE SUBSCRIPTION", 
+					"LINKED DATABASE", 
+					"PROCESS REMOTE SUBSCRIPTION EXCEPTION", 
+					"CREATE VIRTUAL FUNCTION", 
+					"REMOTE EXECUTE", 
+					"REMOTE TABLE ADMIN"
+				]
+			},
+			{
+				"name":"KBP_BW",
+				"type":"REMOTE SOURCE",
+				"privileges":[
+					"CREATE VIRTUAL TABLE", 
+					"CREATE REMOTE SUBSCRIPTION", 
+					"LINKED DATABASE", 
+					"PROCESS REMOTE SUBSCRIPTION EXCEPTION", 
+					"CREATE VIRTUAL FUNCTION", 
+					"REMOTE EXECUTE", 
+					"REMOTE TABLE ADMIN"
+				]
+			}]
+        }
+    }
+}

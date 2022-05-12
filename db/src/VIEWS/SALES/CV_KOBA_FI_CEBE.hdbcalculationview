@@ -1,0 +1,730 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Calculation:scenario xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:Calculation="http://www.sap.com/ndb/BiModelCalculation.ecore" id="CV_KOBA_FI_CEBE" applyPrivilegeType="NONE" dataCategory="CUBE" schemaVersion="3.0" outputViewType="Aggregation" cacheInvalidationPeriod="NONE" enforceSqlExecution="false">
+<descriptions defaultDescription="CV_KOBA_FI_CEBE"/>
+<localVariables/>
+<variableMappings/>
+<dataSources>
+  <DataSource id="FT_FIGLITEM">
+    <resourceUri>FT_FIGLITEM</resourceUri>
+  </DataSource>
+  <DataSource id="DIM_DOCFI">
+    <resourceUri>DIM_DOCFI</resourceUri>
+  </DataSource>
+  <DataSource id="DIM_CEBE_PRCTR">
+    <resourceUri>DIM_CEBE_PRCTR</resourceUri>
+  </DataSource>
+  <DataSource id="DIM_CUENTA">
+    <resourceUri>DIM_CUENTA</resourceUri>
+  </DataSource>
+</dataSources>
+<calculationViews>
+  <calculationView xsi:type="Calculation:ProjectionView" id="Projection_1" filterExpressionLanguage="SQL">
+    <viewAttributes>
+      <viewAttribute id="CD_DW_BELNR"/>
+      <viewAttribute id="CD_DW_BUZEI"/>
+      <viewAttribute id="CD_PERIODO"/>
+      <viewAttribute id="CD_DW_EMPRESA"/>
+      <viewAttribute id="CD_DW_CUENTA"/>
+      <viewAttribute id="CD_DW_CECO"/>
+      <viewAttribute id="CD_DW_CEBE"/>
+      <viewAttribute id="CD_WERKS"/>
+      <viewAttribute id="CD_ANLN1"/>
+      <viewAttribute id="CD_LIFNR"/>
+      <viewAttribute id="CD_KUNNR"/>
+      <viewAttribute id="CD_EBELN"/>
+      <viewAttribute id="CD_EBELP"/>
+      <viewAttribute id="CD_VBELN"/>
+      <viewAttribute id="CD_AUFNR"/>
+      <viewAttribute id="CD_AUGBL"/>
+      <viewAttribute id="XREF1"/>
+      <viewAttribute id="XREF2"/>
+      <viewAttribute id="XREF3"/>
+      <viewAttribute id="ZUONR"/>
+      <viewAttribute id="PS_POSID"/>
+      <viewAttribute id="BSCHL"/>
+      <viewAttribute id="FE_BUDAT"/>
+      <viewAttribute id="CD_DRCRK"/>
+      <viewAttribute id="VL_HSL"/>
+      <viewAttribute id="VL_OSL"/>
+      <viewAttribute id="SGTXT"/>
+      <viewAttribute id="MWSKZ"/>
+      <viewAttribute id="VL_HSL_1"/>
+      <viewAttribute id="VL_OSL_1"/>
+    </viewAttributes>
+    <calculatedViewAttributes/>
+    <input node="FT_FIGLITEM">
+      <mapping xsi:type="Calculation:AttributeMapping" target="VL_HSL_1" source="VL_HSL"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="VL_OSL_1" source="VL_OSL"/>
+    </input>
+    <filter>&quot;CD_DW_CUENTA&quot; in ('1441','1522','1523')</filter>
+  </calculationView>
+  <calculationView xsi:type="Calculation:ProjectionView" id="Projection_2">
+    <viewAttributes>
+      <viewAttribute id="CD_DW_BKPF"/>
+      <viewAttribute id="CD_DW_EMPRESA"/>
+      <viewAttribute id="CD_DW_CEBE"/>
+      <viewAttribute id="CD_EJERCICIO"/>
+      <viewAttribute id="CD_BELNR"/>
+      <viewAttribute id="CD_BLART"/>
+      <viewAttribute id="CD_MBLNR"/>
+      <viewAttribute id="FE_BUDAT"/>
+      <viewAttribute id="XREF1"/>
+      <viewAttribute id="XREF2"/>
+      <viewAttribute id="AWTYP"/>
+      <viewAttribute id="FE_BUDAT_1"/>
+    
+      <viewAttribute id="XBLNR"/>
+    
+      <viewAttribute id="STBLG"/>
+      <viewAttribute id="BKTXT"/>
+      <viewAttribute id="USNAM"/>
+    </viewAttributes>
+    <calculatedViewAttributes/>
+    <input node="DIM_DOCFI">
+      <mapping xsi:type="Calculation:AttributeMapping" target="FE_BUDAT_1" source="FE_BUDAT"/>
+    </input>
+  </calculationView>
+  <calculationView xsi:type="Calculation:JoinView" id="Join_1" cardinality="CN_N" joinType="leftOuter">
+    <viewAttributes>
+      <viewAttribute id="CD_DW_BELNR" aggregationType="sum"/>
+      <viewAttribute id="CD_DW_BUZEI" aggregationType="sum"/>
+      <viewAttribute id="CD_PERIODO"/>
+      <viewAttribute id="CD_DW_EMPRESA" aggregationType="sum"/>
+      <viewAttribute id="CD_DW_CUENTA" aggregationType="sum"/>
+      <viewAttribute id="CD_DW_CECO" aggregationType="sum"/>
+      <viewAttribute id="CD_DW_CEBE" aggregationType="sum"/>
+      <viewAttribute id="CD_WERKS"/>
+      <viewAttribute id="CD_ANLN1"/>
+      <viewAttribute id="CD_LIFNR"/>
+      <viewAttribute id="CD_KUNNR"/>
+      <viewAttribute id="CD_EBELN"/>
+      <viewAttribute id="CD_EBELP" aggregationType="sum"/>
+      <viewAttribute id="CD_VBELN"/>
+      <viewAttribute id="CD_AUFNR"/>
+      <viewAttribute id="CD_AUGBL"/>
+      <viewAttribute id="XREF1"/>
+      <viewAttribute id="XREF2"/>
+      <viewAttribute id="XREF3"/>
+      <viewAttribute id="ZUONR"/>
+      <viewAttribute id="PS_POSID"/>
+      <viewAttribute id="BSCHL"/>
+      <viewAttribute id="FE_BUDAT"/>
+      <viewAttribute id="CD_DRCRK"/>
+      <viewAttribute id="VL_HSL" aggregationType="sum"/>
+      <viewAttribute id="VL_OSL" aggregationType="sum"/>
+      <viewAttribute id="SGTXT"/>
+      <viewAttribute id="MWSKZ"/>
+      <viewAttribute id="CD_DW_BKPF" aggregationType="sum"/>
+      <viewAttribute id="CD_DW_EMPRESA_1" aggregationType="sum"/>
+      <viewAttribute id="CD_DW_CEBE_1" aggregationType="sum"/>
+      <viewAttribute id="CD_EJERCICIO" aggregationType="sum"/>
+      <viewAttribute id="CD_BELNR"/>
+      <viewAttribute id="CD_BLART"/>
+      <viewAttribute id="CD_MBLNR"/>
+      <viewAttribute id="FE_BUDAT_1"/>
+      <viewAttribute id="XREF1_1"/>
+      <viewAttribute id="XREF2_1"/>
+      <viewAttribute id="AWTYP"/>
+      <viewAttribute id="FE_BUDAT_1_1"/>
+      <viewAttribute id="VL_HSL_1" aggregationType="sum"/>
+      <viewAttribute id="VL_OSL_1" aggregationType="sum"/>
+    
+      <viewAttribute id="XBLNR"/>
+    
+      <viewAttribute id="STBLG"/>
+      <viewAttribute id="USNAM"/>
+      <viewAttribute id="BKTXT"/>
+    </viewAttributes>
+    <calculatedViewAttributes/>
+    <input node="Projection_1">
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_BELNR" source="CD_DW_BELNR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_BUZEI" source="CD_DW_BUZEI"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_PERIODO" source="CD_PERIODO"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_EMPRESA" source="CD_DW_EMPRESA"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_CUENTA" source="CD_DW_CUENTA"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_CECO" source="CD_DW_CECO"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_CEBE" source="CD_DW_CEBE"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_WERKS" source="CD_WERKS"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_ANLN1" source="CD_ANLN1"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_LIFNR" source="CD_LIFNR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_KUNNR" source="CD_KUNNR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_EBELN" source="CD_EBELN"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_EBELP" source="CD_EBELP"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_VBELN" source="CD_VBELN"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_AUFNR" source="CD_AUFNR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_AUGBL" source="CD_AUGBL"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="XREF1" source="XREF1"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="XREF2" source="XREF2"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="XREF3" source="XREF3"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="ZUONR" source="ZUONR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="PS_POSID" source="PS_POSID"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="BSCHL" source="BSCHL"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="FE_BUDAT" source="FE_BUDAT"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DRCRK" source="CD_DRCRK"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="VL_HSL" source="VL_HSL"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="VL_OSL" source="VL_OSL"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="SGTXT" source="SGTXT"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="MWSKZ" source="MWSKZ"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="VL_HSL_1" source="VL_HSL_1"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="VL_OSL_1" source="VL_OSL_1"/>
+    </input>
+    <input node="Projection_2">
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_BKPF" source="CD_DW_BKPF"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_EMPRESA_1" source="CD_DW_EMPRESA"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_CEBE_1" source="CD_DW_CEBE"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_EJERCICIO" source="CD_EJERCICIO"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_BELNR" source="CD_BELNR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_BLART" source="CD_BLART"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_MBLNR" source="CD_MBLNR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="FE_BUDAT_1" source="FE_BUDAT"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="XREF1_1" source="XREF1"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="XREF2_1" source="XREF2"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="AWTYP" source="AWTYP"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="FE_BUDAT_1_1" source="FE_BUDAT_1"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="XBLNR" source="XBLNR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="STBLG" source="STBLG"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="USNAM" source="USNAM"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="BKTXT" source="BKTXT"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_BELNR" source="CD_DW_BKPF"/>
+    </input>
+    <joinAttribute name="CD_DW_BELNR"/>
+  </calculationView>
+  <calculationView xsi:type="Calculation:ProjectionView" id="Projection_3">
+    <viewAttributes>
+      <viewAttribute id="CD_DW_CEBE"/>
+      <viewAttribute id="CD_CEBE"/>
+      <viewAttribute id="NM_CEBE"/>
+      <viewAttribute id="CD_EMPRESA"/>
+      <viewAttribute id="CD_CLIENTE"/>
+    
+      <viewAttribute id="CD_DIVISION"/>
+    </viewAttributes>
+    <calculatedViewAttributes/>
+    <input node="DIM_CEBE_PRCTR"/>
+  </calculationView>
+  <calculationView xsi:type="Calculation:JoinView" id="Join_2" cardinality="CN_N" joinType="leftOuter">
+    <viewAttributes>
+      <viewAttribute id="CD_DW_BELNR" aggregationType="sum"/>
+      <viewAttribute id="CD_DW_BUZEI" aggregationType="sum"/>
+      <viewAttribute id="CD_PERIODO"/>
+      <viewAttribute id="CD_DW_EMPRESA" aggregationType="sum"/>
+      <viewAttribute id="CD_DW_CUENTA" aggregationType="sum"/>
+      <viewAttribute id="CD_DW_CECO" aggregationType="sum"/>
+      <viewAttribute id="CD_DW_CEBE" aggregationType="sum"/>
+      <viewAttribute id="CD_WERKS"/>
+      <viewAttribute id="CD_ANLN1"/>
+      <viewAttribute id="CD_LIFNR"/>
+      <viewAttribute id="CD_KUNNR"/>
+      <viewAttribute id="CD_EBELN"/>
+      <viewAttribute id="CD_EBELP" aggregationType="sum"/>
+      <viewAttribute id="CD_VBELN"/>
+      <viewAttribute id="CD_AUFNR"/>
+      <viewAttribute id="CD_AUGBL"/>
+      <viewAttribute id="XREF1"/>
+      <viewAttribute id="XREF2"/>
+      <viewAttribute id="XREF3"/>
+      <viewAttribute id="ZUONR"/>
+      <viewAttribute id="PS_POSID"/>
+      <viewAttribute id="BSCHL"/>
+      <viewAttribute id="FE_BUDAT"/>
+      <viewAttribute id="CD_DRCRK"/>
+      <viewAttribute id="VL_HSL" aggregationType="sum"/>
+      <viewAttribute id="VL_OSL" aggregationType="sum"/>
+      <viewAttribute id="SGTXT"/>
+      <viewAttribute id="MWSKZ"/>
+      <viewAttribute id="CD_DW_BKPF" aggregationType="sum"/>
+      <viewAttribute id="CD_DW_EMPRESA_1" aggregationType="sum"/>
+      <viewAttribute id="CD_DW_CEBE_1" aggregationType="sum"/>
+      <viewAttribute id="CD_EJERCICIO" aggregationType="sum"/>
+      <viewAttribute id="CD_BELNR"/>
+      <viewAttribute id="CD_BLART"/>
+      <viewAttribute id="CD_MBLNR"/>
+      <viewAttribute id="FE_BUDAT_1"/>
+      <viewAttribute id="XREF1_1"/>
+      <viewAttribute id="XREF2_1"/>
+      <viewAttribute id="AWTYP"/>
+      <viewAttribute id="FE_BUDAT_1_1"/>
+    
+      <viewAttribute id="CD_CEBE"/>
+      <viewAttribute id="NM_CEBE"/>
+      <viewAttribute id="CD_EMPRESA"/>
+      <viewAttribute id="CD_CLIENTE" aggregationType="sum"/>
+    
+      <viewAttribute id="XBLNR"/>
+    
+      <viewAttribute id="STBLG"/>
+      <viewAttribute id="CD_DIVISION"/>
+      <viewAttribute id="USNAM"/>
+      <viewAttribute id="BKTXT"/>
+    </viewAttributes>
+    <calculatedViewAttributes/>
+    <input node="Join_1">
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_BELNR" source="CD_DW_BELNR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_BUZEI" source="CD_DW_BUZEI"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_PERIODO" source="CD_PERIODO"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_EMPRESA" source="CD_DW_EMPRESA"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_CUENTA" source="CD_DW_CUENTA"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_CECO" source="CD_DW_CECO"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_CEBE" source="CD_DW_CEBE"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_WERKS" source="CD_WERKS"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_ANLN1" source="CD_ANLN1"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_LIFNR" source="CD_LIFNR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_KUNNR" source="CD_KUNNR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_EBELN" source="CD_EBELN"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_EBELP" source="CD_EBELP"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_VBELN" source="CD_VBELN"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_AUFNR" source="CD_AUFNR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_AUGBL" source="CD_AUGBL"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="XREF1" source="XREF1"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="XREF2" source="XREF2"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="XREF3" source="XREF3"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="ZUONR" source="ZUONR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="PS_POSID" source="PS_POSID"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="BSCHL" source="BSCHL"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="FE_BUDAT" source="FE_BUDAT"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DRCRK" source="CD_DRCRK"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="VL_HSL" source="VL_HSL"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="VL_OSL" source="VL_OSL"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="SGTXT" source="SGTXT"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="MWSKZ" source="MWSKZ"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_BKPF" source="CD_DW_BKPF"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_EMPRESA_1" source="CD_DW_EMPRESA_1"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_CEBE_1" source="CD_DW_CEBE_1"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_EJERCICIO" source="CD_EJERCICIO"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_BELNR" source="CD_BELNR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_BLART" source="CD_BLART"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_MBLNR" source="CD_MBLNR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="FE_BUDAT_1" source="FE_BUDAT_1"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="XREF1_1" source="XREF1_1"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="XREF2_1" source="XREF2_1"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="AWTYP" source="AWTYP"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="FE_BUDAT_1_1" source="FE_BUDAT_1_1"/>
+    
+      <mapping xsi:type="Calculation:AttributeMapping" target="XBLNR" source="XBLNR"/>
+    
+      <mapping xsi:type="Calculation:AttributeMapping" target="STBLG" source="STBLG"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="USNAM" source="USNAM"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="BKTXT" source="BKTXT"/>
+    </input>
+    <input node="Projection_3">
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_CEBE" source="CD_CEBE"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="NM_CEBE" source="NM_CEBE"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_EMPRESA" source="CD_EMPRESA"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_CLIENTE" source="CD_CLIENTE"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DIVISION" source="CD_DIVISION"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_CEBE" source="CD_DW_CEBE"/>
+    </input>
+    <joinAttribute name="CD_DW_CEBE"/>
+  </calculationView>
+  <calculationView xsi:type="Calculation:ProjectionView" id="Projection_4">
+    <viewAttributes>
+      <viewAttribute id="CD_DW_CUENTA"/>
+      <viewAttribute id="CD_CUENTA"/>
+      <viewAttribute id="NM_CUENTA"/>
+    </viewAttributes>
+    <calculatedViewAttributes/>
+    <input node="DIM_CUENTA"/>
+  </calculationView>
+  <calculationView xsi:type="Calculation:JoinView" id="Join_3" cardinality="CN_N" joinType="leftOuter">
+    <viewAttributes>
+      <viewAttribute id="CD_DW_BELNR" aggregationType="sum"/>
+      <viewAttribute id="CD_DW_BUZEI" aggregationType="sum"/>
+      <viewAttribute id="CD_PERIODO"/>
+      <viewAttribute id="CD_DW_EMPRESA" aggregationType="sum"/>
+      <viewAttribute id="CD_DW_CUENTA" aggregationType="sum"/>
+      <viewAttribute id="CD_DW_CECO" aggregationType="sum"/>
+      <viewAttribute id="CD_DW_CEBE" aggregationType="sum"/>
+      <viewAttribute id="CD_WERKS"/>
+      <viewAttribute id="CD_ANLN1"/>
+      <viewAttribute id="CD_LIFNR"/>
+      <viewAttribute id="CD_KUNNR"/>
+      <viewAttribute id="CD_EBELN"/>
+      <viewAttribute id="CD_EBELP" aggregationType="sum"/>
+      <viewAttribute id="CD_VBELN"/>
+      <viewAttribute id="CD_AUFNR"/>
+      <viewAttribute id="CD_AUGBL"/>
+      <viewAttribute id="XREF1"/>
+      <viewAttribute id="XREF2"/>
+      <viewAttribute id="XREF3"/>
+      <viewAttribute id="ZUONR"/>
+      <viewAttribute id="PS_POSID"/>
+      <viewAttribute id="BSCHL"/>
+      <viewAttribute id="FE_BUDAT"/>
+      <viewAttribute id="CD_DRCRK"/>
+      <viewAttribute id="VL_HSL" aggregationType="sum"/>
+      <viewAttribute id="VL_OSL" aggregationType="sum"/>
+      <viewAttribute id="SGTXT"/>
+      <viewAttribute id="MWSKZ"/>
+      <viewAttribute id="CD_DW_BKPF" aggregationType="sum"/>
+      <viewAttribute id="CD_DW_EMPRESA_1" aggregationType="sum"/>
+      <viewAttribute id="CD_DW_CEBE_1" aggregationType="sum"/>
+      <viewAttribute id="CD_EJERCICIO" aggregationType="sum"/>
+      <viewAttribute id="CD_BELNR"/>
+      <viewAttribute id="CD_BLART"/>
+      <viewAttribute id="CD_MBLNR"/>
+      <viewAttribute id="FE_BUDAT_1"/>
+      <viewAttribute id="XREF1_1"/>
+      <viewAttribute id="XREF2_1"/>
+      <viewAttribute id="AWTYP"/>
+      <viewAttribute id="FE_BUDAT_1_1"/>
+      <viewAttribute id="CD_CUENTA"/>
+      <viewAttribute id="NM_CUENTA"/>
+      <viewAttribute id="CD_CEBE"/>
+      <viewAttribute id="NM_CEBE"/>
+      <viewAttribute id="CD_CLIENTE" aggregationType="sum"/>
+    
+      <viewAttribute id="XBLNR"/>
+    
+      <viewAttribute id="STBLG"/>
+      <viewAttribute id="CD_DIVISION"/>
+      <viewAttribute id="USNAM"/>
+      <viewAttribute id="BKTXT"/>
+    </viewAttributes>
+    <calculatedViewAttributes/>
+    <input node="Join_2">
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_BELNR" source="CD_DW_BELNR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_BUZEI" source="CD_DW_BUZEI"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_PERIODO" source="CD_PERIODO"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_EMPRESA" source="CD_DW_EMPRESA"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_CUENTA" source="CD_DW_CUENTA"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_CECO" source="CD_DW_CECO"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_CEBE" source="CD_DW_CEBE"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_WERKS" source="CD_WERKS"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_ANLN1" source="CD_ANLN1"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_LIFNR" source="CD_LIFNR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_KUNNR" source="CD_KUNNR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_EBELN" source="CD_EBELN"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_EBELP" source="CD_EBELP"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_VBELN" source="CD_VBELN"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_AUFNR" source="CD_AUFNR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_AUGBL" source="CD_AUGBL"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="XREF1" source="XREF1"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="XREF2" source="XREF2"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="XREF3" source="XREF3"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="ZUONR" source="ZUONR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="PS_POSID" source="PS_POSID"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="BSCHL" source="BSCHL"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="FE_BUDAT" source="FE_BUDAT"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DRCRK" source="CD_DRCRK"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="VL_HSL" source="VL_HSL"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="VL_OSL" source="VL_OSL"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="SGTXT" source="SGTXT"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="MWSKZ" source="MWSKZ"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_BKPF" source="CD_DW_BKPF"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_EMPRESA_1" source="CD_DW_EMPRESA_1"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_CEBE_1" source="CD_DW_CEBE_1"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_EJERCICIO" source="CD_EJERCICIO"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_BELNR" source="CD_BELNR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_BLART" source="CD_BLART"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_MBLNR" source="CD_MBLNR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="FE_BUDAT_1" source="FE_BUDAT_1"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="XREF1_1" source="XREF1_1"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="XREF2_1" source="XREF2_1"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="AWTYP" source="AWTYP"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="FE_BUDAT_1_1" source="FE_BUDAT_1_1"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_CEBE" source="CD_CEBE"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="NM_CEBE" source="NM_CEBE"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_CLIENTE" source="CD_CLIENTE"/>
+    
+      <mapping xsi:type="Calculation:AttributeMapping" target="XBLNR" source="XBLNR"/>
+    
+      <mapping xsi:type="Calculation:AttributeMapping" target="STBLG" source="STBLG"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DIVISION" source="CD_DIVISION"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="USNAM" source="USNAM"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="BKTXT" source="BKTXT"/>
+    </input>
+    <input node="Projection_4">
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_CUENTA" source="CD_CUENTA"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="NM_CUENTA" source="NM_CUENTA"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_CUENTA" source="CD_DW_CUENTA"/>
+    </input>
+    <joinAttribute name="CD_DW_CUENTA"/>
+  </calculationView>
+</calculationViews>
+<logicalModel id="Join_3">
+  <attributes>
+    <attribute id="CUENTA" order="1" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="CD_CUENTA"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_CUENTA"/>
+    </attribute>
+    <attribute id="NM_CUENTA" order="2" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="NM_CUENTA"/>
+      <keyMapping columnObjectName="Join_3" columnName="NM_CUENTA"/>
+    </attribute>
+    <attribute id="DOC_FI" order="3" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="CD_BELNR"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_BELNR"/>
+    </attribute>
+    <attribute id="ANULADO_CON" order="4" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="STBLG"/>
+      <keyMapping columnObjectName="Join_3" columnName="STBLG"/>
+    </attribute>
+    <attribute id="DIVISION" order="5" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="CD_DIVISION"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_DIVISION"/>
+    </attribute>
+    <attribute id="CEBE" order="6" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="CD_CEBE"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_CEBE"/>
+    </attribute>
+    <attribute id="NM_CEBE" order="7" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="NM_CEBE"/>
+      <keyMapping columnObjectName="Join_3" columnName="NM_CEBE"/>
+    </attribute>
+    <attribute id="CLASE_DOC" order="8" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="CD_BLART"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_BLART"/>
+    </attribute>
+    <attribute id="XREF1" order="9" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="XREF1"/>
+      <keyMapping columnObjectName="Join_3" columnName="XREF1"/>
+    </attribute>
+    <attribute id="PERIODO" order="10" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="CD_PERIODO"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_PERIODO"/>
+    </attribute>
+    <attribute id="FECHA_CONTAB" order="11" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="FE_BUDAT"/>
+      <keyMapping columnObjectName="Join_3" columnName="FE_BUDAT"/>
+    </attribute>
+    <attribute id="CLAVE_CONT" order="12" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="CD_DRCRK"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_DRCRK"/>
+    </attribute>
+    <attribute id="USUARIO" order="14" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="USNAM"/>
+      <keyMapping columnObjectName="Join_3" columnName="USNAM"/>
+    </attribute>
+    <attribute id="TEXTO" order="15" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="BKTXT"/>
+      <keyMapping columnObjectName="Join_3" columnName="BKTXT"/>
+    </attribute>
+    <attribute id="CD_DW_BELNR" order="17" displayAttribute="false" attributeHierarchyActive="false" hidden="true" keepFlag="true">
+      <descriptions defaultDescription="CD_DW_BELNR"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_DW_BELNR"/>
+    </attribute>
+    <attribute id="CD_DW_BUZEI" order="18" displayAttribute="false" attributeHierarchyActive="false" hidden="true" keepFlag="true">
+      <descriptions defaultDescription="CD_DW_BUZEI"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_DW_BUZEI"/>
+    </attribute>
+    <attribute id="CD_DW_EMPRESA" order="19" displayAttribute="false" attributeHierarchyActive="false" hidden="true" keepFlag="true">
+      <descriptions defaultDescription="CD_DW_EMPRESA"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_DW_EMPRESA"/>
+    </attribute>
+    <attribute id="CD_DW_CUENTA" order="20" displayAttribute="false" attributeHierarchyActive="false" hidden="true" keepFlag="true">
+      <descriptions defaultDescription="CD_DW_CUENTA"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_DW_CUENTA"/>
+    </attribute>
+    <attribute id="CD_DW_CECO" order="21" displayAttribute="false" attributeHierarchyActive="false" hidden="true" keepFlag="true">
+      <descriptions defaultDescription="CD_DW_CECO"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_DW_CECO"/>
+    </attribute>
+    <attribute id="CD_DW_CEBE" order="22" displayAttribute="false" attributeHierarchyActive="false" hidden="true" keepFlag="true">
+      <descriptions defaultDescription="CD_DW_CEBE"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_DW_CEBE"/>
+    </attribute>
+    <attribute id="CENTRO" order="23" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="CD_WERKS"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_WERKS"/>
+    </attribute>
+    <attribute id="ACT_FIJO" order="24" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="CD_ANLN1"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_ANLN1"/>
+    </attribute>
+    <attribute id="CUENTA_PRO_ACRE" order="25" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="CD_LIFNR"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_LIFNR"/>
+    </attribute>
+    <attribute id="DEUDOR" order="26" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="CD_KUNNR"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_KUNNR"/>
+    </attribute>
+    <attribute id="DOC_COMPRA" order="27" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="CD_EBELN"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_EBELN"/>
+    </attribute>
+    <attribute id="DOC_COMPR_POSI" order="28" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="CD_EBELP"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_EBELP"/>
+    </attribute>
+    <attribute id="DOC_FACTU" order="29" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="CD_VBELN"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_VBELN"/>
+    </attribute>
+    <attribute id="ORDEN" order="30" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="CD_AUFNR"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_AUFNR"/>
+    </attribute>
+    <attribute id="CD_DW_BKPF" order="31" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="CD_DW_BKPF"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_DW_BKPF"/>
+    </attribute>
+    <attribute id="DOC_COMPENSA" order="32" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="CD_AUGBL"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_AUGBL"/>
+    </attribute>
+    <attribute id="XREF2" order="33" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="XREF2"/>
+      <keyMapping columnObjectName="Join_3" columnName="XREF2"/>
+    </attribute>
+    <attribute id="XREF3" order="34" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="XREF3"/>
+      <keyMapping columnObjectName="Join_3" columnName="XREF3"/>
+    </attribute>
+    <attribute id="ASIGNACION" order="35" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="ZUONR"/>
+      <keyMapping columnObjectName="Join_3" columnName="ZUONR"/>
+    </attribute>
+    <attribute id="PS_POSID" order="36" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="PS_POSID"/>
+      <keyMapping columnObjectName="Join_3" columnName="PS_POSID"/>
+    </attribute>
+    <attribute id="CLAVE_CONTABI" order="37" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="BSCHL"/>
+      <keyMapping columnObjectName="Join_3" columnName="BSCHL"/>
+    </attribute>
+    <attribute id="SGTXT" order="40" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="SGTXT"/>
+      <keyMapping columnObjectName="Join_3" columnName="SGTXT"/>
+    </attribute>
+    <attribute id="MWSKZ" order="41" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="MWSKZ"/>
+      <keyMapping columnObjectName="Join_3" columnName="MWSKZ"/>
+    </attribute>
+    <attribute id="CD_DW_EMPRESA_1" order="42" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="CD_DW_EMPRESA_1"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_DW_EMPRESA_1"/>
+    </attribute>
+    <attribute id="CD_DW_CEBE_1" order="43" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="CD_DW_CEBE_1"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_DW_CEBE_1"/>
+    </attribute>
+    <attribute id="CD_EJERCICIO" order="44" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="CD_EJERCICIO"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_EJERCICIO"/>
+    </attribute>
+    <attribute id="CD_MBLNR" order="45" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="CD_MBLNR"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_MBLNR"/>
+    </attribute>
+    <attribute id="FE_BUDAT_1" order="46" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="FE_BUDAT_1"/>
+      <keyMapping columnObjectName="Join_3" columnName="FE_BUDAT_1"/>
+    </attribute>
+    <attribute id="XREF1_1" order="47" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="XREF1_1"/>
+      <keyMapping columnObjectName="Join_3" columnName="XREF1_1"/>
+    </attribute>
+    <attribute id="XREF2_1" order="48" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="XREF2_1"/>
+      <keyMapping columnObjectName="Join_3" columnName="XREF2_1"/>
+    </attribute>
+    <attribute id="AWTYP" order="49" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="AWTYP"/>
+      <keyMapping columnObjectName="Join_3" columnName="AWTYP"/>
+    </attribute>
+    <attribute id="FE_BUDAT_1_1" order="50" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="FE_BUDAT_1_1"/>
+      <keyMapping columnObjectName="Join_3" columnName="FE_BUDAT_1_1"/>
+    </attribute>
+    <attribute id="CLIENTE" order="51" displayAttribute="false" attributeHierarchyActive="false" hidden="true">
+      <descriptions defaultDescription="CD_CLIENTE"/>
+      <keyMapping columnObjectName="Join_3" columnName="CD_CLIENTE"/>
+    </attribute>
+  
+    <attribute id="XBLNR" order="52" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="XBLNR"/>
+  
+      <keyMapping columnObjectName="Join_3" columnName="XBLNR"/>
+  
+    </attribute>
+  </attributes>
+  <calculatedAttributes>
+    <calculatedAttribute id="FACTURA" order="16" semanticType="empty" displayAttribute="false" attributeHierarchyActive="false">
+      <keyCalculation datatype="NVARCHAR" expressionLanguage="SQL" length="13">
+        <formula>right(&quot;XBLNR&quot;, 8)</formula>
+      </keyCalculation>
+      </calculatedAttribute>
+  </calculatedAttributes>
+  <baseMeasures>
+    <measure id="VL_HSL" order="38" aggregationType="sum" measureType="simple" hidden="true">
+      <descriptions defaultDescription="VL_HSL"/>
+      <measureMapping columnObjectName="Join_3" columnName="VL_HSL"/>
+    </measure>
+    <measure id="VL_OSL" order="39" aggregationType="sum" measureType="simple" hidden="true">
+      <descriptions defaultDescription="VL_OSL"/>
+      <measureMapping columnObjectName="Join_3" columnName="VL_OSL"/>
+    </measure>
+  </baseMeasures>
+  <calculatedMeasures>
+    <measure id="IMPORTE" order="13" aggregationType="sum" measureType="simple" aggregatable="true" datatype="BIGINT" expressionLanguage="SQL">
+      <formula>&quot;VL_HSL&quot; * 100</formula>
+      
+      
+      </measure>
+  </calculatedMeasures>
+  <restrictedMeasures/>
+  <localDimensions/>
+</logicalModel>
+<layout>
+  <shapes>
+    <shape expanded="true" modelObjectName="Output" modelObjectNameSpace="MeasureGroup">
+      <upperLeftCorner x="40" y="85"/>
+    </shape>
+  
+    <shape expanded="true" modelObjectName="Projection_1" modelObjectNameSpace="CalculationView">
+      <upperLeftCorner x="-616" y="741"/>
+      <rectangleSize height="30" width="160"/>
+    </shape>
+    <shape expanded="false" modelObjectName="Projection_2" modelObjectNameSpace="CalculationView">
+      <upperLeftCorner x="-172" y="737"/>
+      <rectangleSize height="30" width="160"/>
+    </shape>
+    <shape expanded="true" modelObjectName="Join_1" modelObjectNameSpace="CalculationView">
+      <upperLeftCorner x="-305" y="492"/>
+      <rectangleSize height="30" width="160"/>
+    </shape>
+    <shape modelObjectName="Projection_1" modelObjectNameSpace="Join_1" modelObjectType="JoinNodeInput">
+      <upperLeftCorner x="20" y="30"/>
+      <rectangleSize width="186"/>
+    </shape>
+    <shape modelObjectName="Projection_2" modelObjectNameSpace="Join_1" modelObjectType="JoinNodeInput">
+      <upperLeftCorner x="320" y="30"/>
+      <rectangleSize width="186"/>
+    </shape>
+    <shape expanded="true" modelObjectName="Projection_3" modelObjectNameSpace="CalculationView">
+      <upperLeftCorner x="91" y="526"/>
+      <rectangleSize height="30" width="160"/>
+    </shape>
+    <shape expanded="true" modelObjectName="Join_2" modelObjectNameSpace="CalculationView">
+      <upperLeftCorner x="-117" y="313"/>
+      <rectangleSize height="30" width="160"/>
+    </shape>
+    <shape modelObjectName="Join_1" modelObjectNameSpace="Join_2" modelObjectType="JoinNodeInput">
+      <upperLeftCorner x="20" y="30"/>
+      <rectangleSize width="102"/>
+    </shape>
+    <shape modelObjectName="Projection_3" modelObjectNameSpace="Join_2" modelObjectType="JoinNodeInput">
+      <upperLeftCorner x="320" y="30"/>
+      <rectangleSize width="162"/>
+    </shape>
+  
+    <shape expanded="true" modelObjectName="Projection_4" modelObjectNameSpace="CalculationView">
+      <upperLeftCorner x="156" y="337"/>
+      <rectangleSize height="30" width="160"/>
+    </shape>
+    <shape expanded="true" modelObjectName="Join_3" modelObjectNameSpace="CalculationView">
+      <upperLeftCorner x="1" y="175"/>
+      <rectangleSize height="30" width="160"/>
+    </shape>
+    <shape modelObjectName="Join_2" modelObjectNameSpace="Join_3" modelObjectType="JoinNodeInput">
+      <upperLeftCorner x="20" y="30"/>
+      <rectangleSize width="186"/>
+    </shape>
+    <shape modelObjectName="Projection_4" modelObjectNameSpace="Join_3" modelObjectType="JoinNodeInput">
+      <upperLeftCorner x="320" y="30"/>
+      <rectangleSize width="176"/>
+    </shape>
+  </shapes>
+</layout>
+</Calculation:scenario>

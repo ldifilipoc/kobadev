@@ -1,0 +1,154 @@
+{
+  "role": {
+    "name": "Z_ROLE_K_PORTAL_G#",
+    "object_privileges": [
+      {
+        "name": "DIM_DOCCOMPRA",
+        "type": "TABLE",
+        "privileges": [
+          "SELECT"
+        ],
+        "privileges_with_grant_option": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "FT_COMPRA",
+        "type": "TABLE",
+        "privileges": [
+          "SELECT"
+        ],
+        "privileges_with_grant_option": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "FT_0FIAP4",
+        "type": "TABLE",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "DIM_MATERIAL",
+        "type": "TABLE",
+        "privileges": [
+          "SELECT"
+        ],
+        "privileges_with_grant_option": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "DIM_BPARTNER",
+        "type": "TABLE",
+        "privileges": [
+          "SELECT"
+        ],
+        "privileges_with_grant_option": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "FT_MARDH",
+        "type": "TABLE",
+        "privileges": [
+          "SELECT"
+        ],
+        "privileges_with_grant_option": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "STG_ABAP_ZTMM_ZESTADOART",
+        "type": "TABLE",
+        "privileges": [
+          "SELECT"
+        ],
+        "privileges_with_grant_option": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "FT_MSEG",
+        "type": "TABLE",
+        "privileges": [
+          "SELECT"
+        ],
+        "privileges_with_grant_option": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "KOBA_HISTORIAL_PEDIDO_VIEW",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ],
+        "privileges_with_grant_option": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "VW_COMPRA_INVENTARIO",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ],
+        "privileges_with_grant_option": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "VW_KOBA_HISTORIAL_PEDIDO_CLASE_DOC",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ],
+        "privileges_with_grant_option": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "KOBA_COMPRA_VIEW",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ],
+        "privileges_with_grant_option": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "KOBA_CONSOLIDADO_COMPRA_VIEW",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ],
+        "privileges_with_grant_option": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "KOBA_DETALLE_COMPRA_VIEW",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ],
+        "privileges_with_grant_option": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "KOBA_HISTORIAL_PEDIDO_VIEW",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ],
+        "privileges_with_grant_option": [
+          "SELECT"
+        ]
+      }
+    ]
+  }
+}

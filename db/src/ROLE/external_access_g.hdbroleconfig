@@ -1,0 +1,7 @@
+{
+  "koba::external_access_g#": {
+    "KOBA_HDI_DB_1": {
+      "schema": "KOBA_HDI_DB_1"
+    }
+  }
+}

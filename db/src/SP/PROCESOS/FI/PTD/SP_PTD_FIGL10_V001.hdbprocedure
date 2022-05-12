@@ -1,0 +1,39 @@
+PROCEDURE "SP_PTD_FIGL10_V001"()
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+       Cargue de la información del periodo
+   *************************************/
+    Declare pEmpresa smallint = 28;
+    Declare Periodo varchar(7);
+    Declare pBUKRS_L VARCHAR(4) = '6A0L';
+	Declare pPER1 VARCHAR(10);
+	Declare pPER2 VARCHAR(10);
+	Declare pBUKRS varchar(4) = '6A00';
+	Declare Periodo_Int1 VARCHAR(10);
+	Declare Periodo_Int2 VARCHAR(10); 
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+
+	select	Year(add_months("DESDE2",-1))||'0'||TO_VARCHAR(Month(add_months("DESDE2",-1)),'00') PERIODO1, 
+			"PERIODO2", CD_PERIODO1, CD_PERIODO2 
+	into pPER1,pPER2, Periodo_Int1, Periodo_Int2
+	from DIM_FISPER;
+	
+    truncate table STG_0FI_GL_10;
+    CALL SP_STG_FIGL10_LOAD_V001(:pPER1);
+    CALL SP_FT_FIGL_LOAD_V001(:pPER1);
+    
+	--CALL SP_PTD_SALDOS_PARA_CONSOLIDACION(:Periodo_Int1);
+	
+	IF :pPER1<>:pPER2 THEN
+		truncate table STG_0FI_GL_10;
+	    CALL SP_STG_FIGL10_LOAD_V001(:pPER2);
+	    CALL SP_FT_FIGL_LOAD_V001(:pPER2);
+	    --CALL SP_PTD_SALDOS_PARA_CONSOLIDACION(:Periodo_Int2);
+	END IF;
+	
+	
+END

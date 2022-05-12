@@ -1,0 +1,225 @@
+{
+  "role": {
+    "name": "Z_ROLE_K_FI_AM_ACTUALIZAR",
+    "object_privileges": [
+      {
+        "name": "SP_PDT_ACTIVO_LOAD",
+        "type": "PROCEDURE",
+        "privileges": [
+          "EXECUTE"
+        ]
+      },
+      {
+        "name": "STG_ABAP_ANEA",
+        "type": "TABLE",
+        "privileges": [
+          "UPDATE",
+          "SELECT",
+          "INSERT"
+        ]
+      },
+      {
+        "name": "STG_ABAP_ANEK",
+        "type": "TABLE",
+        "privileges": [
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ]
+      },
+      {
+        "name": "STG_ABAP_ANEP",
+        "type": "TABLE",
+        "privileges": [
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ]
+      },
+      {
+        "name": "STG_ABAP_ANLP",
+        "type": "TABLE",
+        "privileges": [
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ]
+      },
+      {
+        "name": "STG_ABAP_ANLC",
+        "type": "TABLE",
+        "privileges": [
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ]
+      },
+      {
+        "name": "FT_ANLC",
+        "type": "TABLE",
+        "privileges": [
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ]
+      },
+      {
+        "name": "FT_ANLP",
+        "type": "TABLE",
+        "privileges": [
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ]
+      },
+      {
+        "name": "FT_ANEA",
+        "type": "TABLE",
+        "privileges": [
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ]
+      },
+      {
+        "name": "FT_ANEK",
+        "type": "TABLE",
+        "privileges": [
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ]
+      },
+      {
+        "name": "FT_ANEP",
+        "type": "TABLE",
+        "privileges": [
+          "UPDATE",
+          "SELECT",
+          "INSERT"
+        ]
+      },
+      {
+        "name": "SP_DIM_ACTIVO_LOAD",
+        "type": "PROCEDURE",
+        "privileges": [
+          "EXECUTE"
+        ]
+      },
+      {
+        "name": "DIM_ACTIVO",
+        "type": "TABLE",
+        "privileges": [
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ]
+      },
+      {
+        "name": "STG_ABAP_ANLA",
+        "type": "TABLE",
+        "privileges": [
+          "SELECT",
+          "UPDATE",
+          "INSERT"
+        ]
+      },
+      {
+        "name": "STG_ABAP_ANLB",
+        "type": "TABLE",
+        "privileges": [
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ]
+      },
+      {
+        "name": "STG_ABAP_ANLZ",
+        "type": "TABLE",
+        "privileges": [
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ]
+      },
+      {
+        "name": "STG_ABAP_T095",
+        "type": "TABLE",
+        "privileges": [
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ]
+      },
+      {
+        "name": "STG_ABAP_T095B",
+        "type": "TABLE",
+        "privileges": [
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ]
+      },
+      {
+        "name": "DIM_CUENTA_ACTIVO",
+        "type": "TABLE",
+        "privileges": [
+          "INSERT",
+          "SELECT",
+          "UPDATE"
+        ]
+      },
+      {
+        "name": "STG_ABAP_ANEK",
+        "type": "TABLE",
+        "privileges": [
+          "UPDATE",
+          "SELECT",
+          "INSERT"
+        ]
+      },
+      {
+        "name": "SP_FT_ACTIVO_LOAD__V001",
+        "type": "PROCEDURE",
+        "privileges": [
+          "EXECUTE"
+        ]
+      },
+      {
+        "name": "SP_STG_ANEK_LOAD_V001",
+        "type": "PROCEDURE",
+        "privileges": [
+          "EXECUTE"
+        ]
+      },
+      {
+        "name": "SP_STG_ANEA_LOAD_V001",
+        "type": "PROCEDURE",
+        "privileges": [
+          "EXECUTE"
+        ]
+      },
+      {
+        "name": "SP_STG_ANEP_LOAD_V001",
+        "type": "PROCEDURE",
+        "privileges": [
+          "EXECUTE"
+        ]
+      },
+      {
+        "name": "SP_STG_ANLP_LOAD_V001",
+        "type": "PROCEDURE",
+        "privileges": [
+          "EXECUTE"
+        ]
+      },
+      {
+        "name": "SP_STG_ANLC_LOAD_V001",
+        "type": "PROCEDURE",
+        "privileges": [
+          "EXECUTE"
+        ]
+      }
+    ]
+  }
+} 

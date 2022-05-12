@@ -1,0 +1,71 @@
+PROCEDURE "SP_FT_COEP_ZTPOS_LOAD"()
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+	declare n int;
+	Declare pBELNR_DESDE VARCHAR(20);
+	Declare pBELNR_HASTA VARCHAR(20);
+	Declare pGJAHR VARCHAR(4);
+	Declare pBLART VARCHAR(2);
+	Declare M int;
+	Declare pBUKRS VARCHAR(10)= '6A00';
+	Declare pEmpresa SMALLINT = 28;
+	
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+   /*************************************
+	Carga del impuesto, impoconsumo, costo contabilizado, costo unitario
+	Fecha de Creación:06/02/2020
+	Creado por: CORG-JPIMIENTA
+	Modifica:CORG-JPIMIENTA
+	Motivo cambio:	11/02/2020	Separación del proceso de carga de la ZTFI_DTS_IMP para agilizar la carga de la COEP y la FIGL10 para no generar diferencias
+	
+	Stage table: STG_COEP,STG_COBK,STG_ZTFI_DTS_IMP
+	Hecho destino: FT_COEP
+   *************************************/
+    select Count(BELNR) into n from STG_ABAP_ZTFI_DTS_IMP;
+   
+	Partidas_CO=SELECT	D.CD_DW_BKPF,
+						CAST(IMP.BUZEI AS smallint) CD_ITEM,
+						D.CD_EJERCICIO*100+MONTH(FE_BUDAT) CD_PERIODO,
+						D.CD_EJERCICIO,
+						D.FE_BUDAT, 
+						Max(IMP.WW010) CD_IVA, 
+						Sum(cast(IMP.WW011  as decimal(15,2))) VL_IVA,  
+						Max(IMP.WW012) CD_IMPOCONSUMO,
+						Sum(cast(IMP.WW013 as decimal(15,3))) VL_IMPOCONSUMO,
+						Sum(IMP.DMBTR*100) VL_COSTO
+			--			IMP.CPUDT FE_CPUDT
+				FROM STG_ABAP_ZTFI_DTS_IMP IMP 
+				INNER JOIN DIM_DOCFI D	
+						ON IMP.BELNR = D.CD_BELNR AND IMP.GJAHR=D.CD_EJERCICIO AND D.CD_DW_EMPRESA = 28 
+				WHERE D.POS_ITEMS < 1 --Documentos que no han sido previamente cargados.
+				GROUP BY D.CD_EJERCICIO,D.CD_DW_BKPF,D.FE_BUDAT,IMP.BUZEI;
+				--,IMP.CPUDT
+
+	INSERT INTO FT_COEP_ZTPOS(CD_DW_BKPF, CD_ITEM, CD_PERIODO, FE_BUDAT, CD_IVA, CD_IMPOCONSUMO, VL_IVA, VL_IMPOCONSUMO, VL_COSTO)
+	SELECT CD_DW_BKPF, CD_ITEM, CD_EJERCICIO*100+MONTH(FE_BUDAT) PER, FE_BUDAT, CD_IVA, CD_IMPOCONSUMO, VL_IVA, VL_IMPOCONSUMO, VL_COSTO
+	FROM :Partidas_CO;
+	commit;
+	
+	--Se actualiza el encabezado del documento financiero con la cantidad de items cargados para no volver a cargar.
+	MERGE INTO DIM_DOCFI D
+	USING 	(SELECT CD_DW_BKPF,count(CD_DW_BKPF) conteo
+			 FROM :Partidas_CO GROUP BY CD_DW_BKPF) S 
+		ON S.CD_DW_BKPF = D.CD_DW_BKPF
+	WHEN MATCHED THEN UPDATE SET POS_ITEMS = S.conteo;
+	commit;
+
+/*
+	En caso de falla del proceso o cuando requiera reprocesamiento histórico 
+	este query inserta los documentos de un rango de fecha para que se vuelvan a cargar
+	
+	insert into ETL_CONTROL_CARGUE(TABLA,FECHA_CARGA,BUKRS,GJAHR,BLART,BELNR_DESDE,BELNR_HASTA,ULTIMA_FECHA,REGISTROS_PROCESADOS,CARGA_POS,TIPO_CARGA)
+	select 'ZTFI_DTS_IMP',FE_CPUDT,'6A00',2020,'I1',Min(CD_BELNR), Max(CD_BELNR),FE_CPUDT,0,'P','F'
+	from DWH_HDI_DB_1.DIM_DOCFI 
+	where CD_BLART='I1' AND FE_BUDAT BETWEEN '20200301' AND '20200407'
+	group by FE_CPUDT;
+
+*/
+END

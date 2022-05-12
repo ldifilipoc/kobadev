@@ -1,0 +1,77 @@
+PROCEDURE "SP_PTD_BSEG_COMPENSADOS"(Filtrar_Empresa Varchar(4), Periodo VARCHAR(6), Clase_Doc1 VARCHAR(2), Clase_Doc2 VARCHAR(2))
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+   PTD: Proceso de transferencia de datos
+	Carga de documentos compensados del periodo
+	Proceso manual ante cualquier eventualidad del extractor estándar 0FI_GL_14 o a falta de documentos compensados
+	Si Filtrar_Empresa = '' Carga todas las empresas configuradas en el tenant de KOBA
+	Por el volúmen de datos que tiene KOBA se requiere almacenar la compensación en una tabla diferente. 
+	KOBA tiene sus procesos de carga en el Tenant KBP.
+	
+	Fecha de Creación:24/06/2021
+	Creado por: CORG
+	Modifica:CORG
+	Motivo cambio:	
+					
+	Stage table:  STG_ABAP_BSEG
+	Hecho destino: FT_BSEG_COMPENSADO
+   *************************************/   
+	Declare i int=0;
+	Declare M bigint=0;
+	Declare pFECHA_CARGA Datetime;
+	Declare pTabla VARCHAR(50)= 'BSEG';
+	Declare pReg bigint = 0;
+	Declare Desde DATE = :Periodo || '01';
+	Declare Hasta DATE = LAST_DAY(:Periodo || '01' );
+	Declare Ejercicio INT = TO_INT(LEFT(:Periodo,4));
+	
+	DECLARE CURSOR Cursor_BELNR FOR
+	SELECT EMP.CD_EMPRESA BUKRS, substring(DOC.CD_BELNR,1,4) Consec, DOC.CD_EJERCICIO, Min(DOC.CD_BELNR) BELNR_Desde, Max(DOC.CD_BELNR) BELNR_Hasta, Count(DOC.CD_BELNR) Cantidad, ETL.PART_ID
+	FROM DIM_DOCFI DOC 
+	INNER JOIN DIM_EMPRESA EMP 
+		ON DOC.CD_DW_EMPRESA = EMP.CD_DW_EMPRESA
+	INNER JOIN ETL_PARTICIONES ETL 
+		ON ETL.TABLA = 'FT_BSEG_COMPENSADO' 
+		AND ETL.PERIODO = DOC.CD_EJERCICIO
+	WHERE DOC.CD_EJERCICIO = :Ejercicio
+	AND DOC.BSTAT = ''
+	AND DOC.FE_BUDAT BETWEEN :Desde AND :Hasta
+	AND DOC.CD_BLART != 'IC'
+	AND DOC.CD_BLART != 'XC'
+	AND (DOC.CD_BLART = :Clase_Doc1 OR :Clase_Doc1 = '')
+	AND (:Filtrar_Empresa='' OR EMP.CD_EMPRESA = :Filtrar_Empresa)
+	AND NOT DOC.CD_BLART IN (SELECT CD_DIMENSION FROM ETL_TRADUCCION WHERE CD_TABLA = 2) --Documentos excluidos y que no tienen Split por CEBE: I1, W*
+	GROUP BY EMP.CD_EMPRESA, substring(DOC.CD_BELNR,1,4), DOC.CD_EJERCICIO, ETL.PART_ID
+
+	UNION ALL  --documentos IC como tienen consecutivo igual al del I1 (Carga POS) se desglozan en rangos de 1000 consecutivos
+	
+	SELECT EMP.CD_EMPRESA BUKRS, substring(DOC.CD_BELNR,1,7) Consec, DOC.CD_EJERCICIO, Min(DOC.CD_BELNR) BELNR_Desde, Max(DOC.CD_BELNR) BELNR_Hasta, Count(DOC.CD_BELNR) Cantidad, ETL.PART_ID
+	FROM DIM_DOCFI DOC 
+	INNER JOIN DIM_EMPRESA EMP 
+		ON DOC.CD_DW_EMPRESA = EMP.CD_DW_EMPRESA
+	INNER JOIN ETL_PARTICIONES ETL 
+		ON ETL.TABLA = 'FT_BSEG_COMPENSADO' 
+		AND ETL.PERIODO = DOC.CD_EJERCICIO
+	WHERE DOC.CD_EJERCICIO = :Ejercicio
+	AND DOC.BSTAT = ''
+	AND DOC.FE_BUDAT BETWEEN :Desde AND :Hasta
+	AND DOC.CD_BLART IN ('XC','IC')
+	AND (DOC.CD_BLART IN (:Clase_Doc1, :Clase_Doc2))
+	AND (:Filtrar_Empresa='' OR EMP.CD_EMPRESA = :Filtrar_Empresa)
+	AND NOT DOC.CD_BLART IN (SELECT CD_DIMENSION FROM ETL_TRADUCCION WHERE CD_TABLA = 2) --Documentos excluidos y que no tienen Split por CEBE: I1, W*
+	GROUP BY EMP.CD_EMPRESA, substring(DOC.CD_BELNR,1,7), DOC.CD_EJERCICIO, ETL.PART_ID
+	;
+
+	--DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    --   SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+    
+	FOR F_row AS Cursor_BELNR DO
+		TRUNCATE TABLE STG_ABAP_BSEG;
+		CALL SP_STG_BSEG_LOAD_V002(F_row.CD_EJERCICIO,F_row.BUKRS,F_row.BELNR_Desde,F_row.BELNR_Hasta, F_row.PART_ID);
+	END FOR;
+
+
+END

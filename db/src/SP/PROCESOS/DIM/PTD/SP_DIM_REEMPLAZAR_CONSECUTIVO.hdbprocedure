@@ -1,0 +1,37 @@
+PROCEDURE "SP_DIM_REEMPLAZAR_CONSECUTIVO"(DIMENSION VARCHAR(50), Actual INT, Nuevo INT)
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+       Maestro de Materiales de KOBA
+       Carga el ID y texto del Material de KOBA al stage con base a la tarea de replicación: RT_0MATERIAL_TEXT
+       La tarea de replicación filtra solo los materiales con la siguiente condición
+    		SPRAS='S' 
+    		AND (   (MATNR>= '000000000011000000' AND MATNR< '000000000013000000') 
+    		     OR (MATNR>= '000000000060000000' AND MATNR< '000000000069999999'))
+       
+       Extractor Fuente VT_0MATERIAL, destino STG_0MATERIAL, Dimensión: DIM_MATERIAL
+   *************************************/
+	IF :DIMENSION = 'DIM_CEBE_PRCTR' THEN
+	
+		UPDATE DIM_CEBE_PRCTR SET CD_DW_CEBE = :Nuevo WHERE CD_DW_CEBE = :Actual;
+		UPDATE DIM_ACTIVO SET CD_DW_CEBE = :Nuevo WHERE CD_DW_CEBE = :Actual;
+		UPDATE DIM_CEBE_CLIENTE SET CD_DW_CEBE = :Nuevo WHERE CD_DW_CEBE = :Actual;
+		UPDATE DIM_DOCFI SET CD_DW_CEBE = :Nuevo WHERE CD_DW_CEBE = :Actual;
+		UPDATE FT_ANLP SET CD_DW_CEBE = :Nuevo WHERE CD_DW_CEBE = :Actual;
+		UPDATE FT_BSEG_VBRK SET CD_DW_CEBE = :Nuevo WHERE CD_DW_CEBE = :Actual;
+		UPDATE FT_COEP SET CD_DW_CEBE = :Nuevo WHERE CD_DW_CEBE = :Actual;
+		UPDATE FT_COMPRA_INVENTARIO SET CD_DW_CEBE = :Nuevo WHERE CD_DW_CEBE = :Actual;
+		UPDATE FT_FIGL SET CD_DW_CEBE = :Nuevo WHERE CD_DW_CEBE = :Actual;
+		UPDATE FT_FIGLITEM SET CD_DW_CEBE = :Nuevo WHERE CD_DW_CEBE = :Actual;
+		UPDATE FT_KPI SET CD_DW_CEBE = :Nuevo WHERE CD_DW_CEBE = :Actual;
+		UPDATE FT_MARC SET CD_DW_CEBE = :Nuevo WHERE CD_DW_CEBE = :Actual;
+		UPDATE FT_MARD SET CD_DW_CEBE = :Nuevo WHERE CD_DW_CEBE = :Actual;
+		UPDATE FT_MSEG SET CD_DW_CEBE = :Nuevo WHERE CD_DW_CEBE = :Actual;
+		UPDATE FT_SALESBYITEM SET CD_DW_CEBE = :Nuevo WHERE CD_DW_CEBE = :Actual;
+		UPDATE FT_VAT SET CD_DW_CEBE = :Nuevo WHERE CD_DW_CEBE = :Actual;
+		
+	END IF;
+	
+END

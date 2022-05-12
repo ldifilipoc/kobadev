@@ -1,0 +1,47 @@
+PROCEDURE "SP_DIM_CEBE_LOAD"( )
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+       Creación de Centros de Beneficio de KOBA
+       
+    	LANGU='S' 
+    	KOKRS = '6100'
+    	
+   *************************************/
+   	declare Consecutivo int;
+
+	--DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    --   SELECT ::SQL_ERROR_CODE ERROR_CEBE, ::SQL_ERROR_MESSAGE ERROR_CEBE_MSG FROM TDUMMY;
+
+	--Se replican los datos a la tabla de stage
+	call "RT_0PROFIT_CTR_TEXT.START_REPLICATION";
+	
+	--Último CEBE válido
+	Last_Txt =  select PRCTR, Max(DATEFROM) DATEFROM
+			from STG_0PROFIT_CTR_TEXT
+			group by PRCTR;
+			
+	Cebe =	select T.PRCTR CD_CEBE, T.TXTMD NM_CEBE, T.TXTSH NM_CEBE_ST, T.DATETO FE_DATETO, T.DATEFROM FE_DATEFROM,'N' FL_ESNODO, T.KOKRS CD_EMPRESA
+			from "STG_0PROFIT_CTR_TEXT" T
+			inner join :Last_Txt LT 
+				ON  LT.PRCTR = T.PRCTR
+				AND LT.DATEFROM = T.DATEFROM
+			left join DIM_CEBE_PRCTR DIM
+				ON T.PRCTR = DIM.CD_CEBE
+			where DIM.CD_DW_CEBE is null; 
+
+	
+	--Se obtiene el máximo consecutivo ingresado en el maestro de CEBE
+	select Max(CD_DW_CEBE) into Consecutivo from "DIM_CEBE_PRCTR";
+	
+	--Se insertan los nuevos centros de beneficio
+	INSERT INTO "DIM_CEBE_PRCTR"("CD_DW_CEBE","CD_CEBE","NM_CEBE","NM_CEBE_ST","FE_DATETO","FE_DATEFROM",FE_CREACION,FL_ESNODO, CD_EMPRESA, CD_CLIENTE, NM_CLIENTE)
+	select :Consecutivo + ROW_NUMBER() OVER (ORDER BY CD_CEBE), CD_CEBE, NM_CEBE, NM_CEBE_ST, FE_DATETO, FE_DATEFROM,FE_DATEFROM, FL_ESNODO, CD_EMPRESA,0, 'REGIONAL'
+	from :Cebe; 
+	
+	COMMIT;
+	truncate table "STG_0PROFIT_CTR_TEXT";
+	
+END

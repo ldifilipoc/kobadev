@@ -1,0 +1,49 @@
+{
+  "role": {
+    "name": "Z_ROLE_K_SD",
+    "object_privileges": [
+      {
+        "name": "KOBA_REPORTE_SALES_BY_ITEM_VIEW",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "KOBA_REPORTE_SALESBYITEM_FECHA",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "DIM_CEBE_PRCTR",
+        "type": "TABLE",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "DIM_BPARTNER",
+        "type": "TABLE",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "DIM_MATERIAL",
+        "type": "TABLE",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "KOBA_REPORTE_SALES_BY_ITEM_DAY_VIEW",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      }
+    ]
+  }
+}

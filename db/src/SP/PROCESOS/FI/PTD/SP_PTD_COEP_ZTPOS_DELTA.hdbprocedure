@@ -1,0 +1,66 @@
+PROCEDURE "SP_PTD_COEP_ZTPOS_DELTA"()
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+   PTD: Proceso de transferencia de datos
+	Carga de Ingresos por material en modo delta (en base al campo CPUDT) de los ultimos 2 dias
+	Fecha de Creación:11/02/2022
+	Creado por: MGUIXE
+	
+	Stage table:  STG_ZTFI_DTS_IMP
+	Hecho destino: FT_COEP_ZTPOS
+	Agendamiento de carga: En SAP CPI-DI, Proceso 2_P_FINANZAS 
+   *************************************/
+	Declare pFH_INICIO VARCHAR(8);
+	Declare pFH_FIN VARCHAR(8);
+	Declare V_SQL NVARCHAR(500);
+	Declare RANGO VARCHAR(200);
+	
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+    
+    -- Recarga los ultimos 3 dias
+    pFH_INICIO	= TO_VARCHAR(ADD_DAYS(CURRENT_DATE,-2),'YYYYMMDD');
+    pFH_FIN		= TO_VARCHAR(CURRENT_DATE,'YYYYMMDD');
+    
+    -- Se carga la info en la tabla de Stage   
+    truncate table STG_ABAP_ZTFI_DTS_IMP;
+       
+	RANGO= 'WHERE BUKRS=''6A00'' AND CPUDT between '''||:pFH_INICIO||''' AND '''||:pFH_FIN||'''';
+	
+	V_SQL=	'insert into KOBA_HDI_DB_1.STG_ABAP_ZTFI_DTS_IMP(BUKRS,BELNR,GJAHR,BUZEI,WW010,WW011,WW012,WW013,DMBTR,PRCTR,CPUDT) '||
+			'SELECT BUKRS,BELNR,GJAHR,BUZEI,WW010,WW011,WW012,WW013,DMBTR,PRCTR,CPUDT '||
+			'FROM KOBA_HDI_DB_1.VT_ABAP_ZTFI_DTS_IMP '||:RANGO;
+	EXECUTE IMMEDIATE V_SQL;
+	commit;
+	
+	-- Se borra la info de la FT para luego recargar
+	DELETE FROM FT_COEP_ZTPOS
+	WHERE FE_CPUDT BETWEEN :pFH_INICIO AND :pFH_FIN; 
+	
+	-- Se recarga la info
+	
+	Partidas_CO=SELECT	D.CD_DW_BKPF,
+						CAST(IMP.BUZEI AS smallint) CD_ITEM,
+						D.CD_EJERCICIO*100+MONTH(FE_BUDAT) CD_PERIODO,
+						D.CD_EJERCICIO,
+						D.FE_BUDAT, 
+						Max(IMP.WW010) CD_IVA, 
+						Sum(cast(IMP.WW011  as decimal(15,2))) VL_IVA,  
+						Max(IMP.WW012) CD_IMPOCONSUMO,
+						Sum(cast(IMP.WW013 as decimal(15,3))) VL_IMPOCONSUMO,
+						Sum(IMP.DMBTR*100) VL_COSTO,
+						IMP.CPUDT FE_CPUDT 
+				FROM STG_ABAP_ZTFI_DTS_IMP IMP 
+				INNER JOIN DIM_DOCFI D	
+						ON IMP.BELNR = D.CD_BELNR AND IMP.GJAHR=D.CD_EJERCICIO AND D.CD_DW_EMPRESA = 28 
+				GROUP BY D.CD_EJERCICIO,D.CD_DW_BKPF,D.FE_BUDAT,IMP.BUZEI,IMP.CPUDT; 
+
+	INSERT INTO FT_COEP_ZTPOS(CD_DW_BKPF, CD_ITEM, CD_PERIODO, FE_BUDAT, CD_IVA, CD_IMPOCONSUMO, VL_IVA, VL_IMPOCONSUMO, VL_COSTO,FE_CPUDT)  
+	SELECT CD_DW_BKPF, CD_ITEM, CD_EJERCICIO*100+MONTH(FE_BUDAT) PER, FE_BUDAT, CD_IVA, CD_IMPOCONSUMO, VL_IVA, VL_IMPOCONSUMO, VL_COSTO,FE_CPUDT 
+	FROM :Partidas_CO;
+	commit;
+
+END

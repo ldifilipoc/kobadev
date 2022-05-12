@@ -1,0 +1,184 @@
+COLUMN TABLE DIM_COMPRA(	--CABECERA ORDEN DE COMPRAS
+	CD_EBELN VARCHAR(10),	--Número de Documento
+	CD_EJERCICIO SMALLINT,	--Año del documento según el AEDAT: Fecha de creación del registro
+	CD_EKORG VARCHAR(4),	--Organización de compras
+	CD_LIFNR VARCHAR(10),	--Proveedor
+	CD_LLIEF VARCHAR(10) ,	--Proveedor para suministro
+	CD_KUNNR VARCHAR(10) ,	--Cliente
+	CD_BSART VARCHAR(4),	--Tipo de documento de compra
+	CD_RESWK VARCHAR(4),	--Centro suministrador 
+	FL_BSTYP VARCHAR(1),	--Tp.documento compras 
+	FL_BSAKZ VARCHAR(1),	--Indicador de control
+	FL_LOEKZ VARCHAR(1),	--Indicador de borrado
+	FL_STATU VARCHAR(1),	--Status
+	FL_AUTLF VARCHAR(1),	--Suministro completo 
+	FE_AEDAT DATE,			--Creado el 
+	FE_BEDAT DATE,			--Fecha documento 
+	NM_ERNAM NVARCHAR(12),	--Creado por
+	CD_EKGRP VARCHAR(3),	--Grupo de compras 
+	CD_KNUMV VARCHAR(10),	--Nº condición docum.
+	CD_KALSM VARCHAR(6),	--Esquema (determ.precio, mensajes, determ.cuentas,...)
+	CD_WEAKT VARCHAR(1),	--Indicador: Mensaje de entrada de mercancías  
+	CD_VERKF VARCHAR(30),	--Vendedor/a 
+	CD_LPONR SMALLINT,		--Última posición
+	NU_ITEMS SMALLINT DEFAULT -1, --Cantidad de items en el documento
+	NU_ITEMS_ENTREGA SMALLINT DEFAULT -1,
+	NU_ITEMS_RECIBIDO SMALLINT DEFAULT -1,
+	PRIMARY KEY (
+		CD_EBELN,
+		CD_EJERCICIO
+	)
+)
+UNLOAD PRIORITY 5 AUTO MERGE
+	PARTITION BY RANGE ("CD_EJERCICIO")(
+		PARTITION '2010' <= VALUES <'2017',
+		PARTITION VALUE = '2017',
+		PARTITION VALUE = '2018',
+		PARTITION VALUE = '2019',
+		PARTITION VALUE = '2020',
+		PARTITION VALUE = '2021',
+		PARTITION VALUE = '2022',
+		PARTITION VALUE = '2023',
+		PARTITION VALUE = '2024',
+		PARTITION VALUE = '2025',
+		PARTITION VALUE = '2026',
+		PARTITION VALUE = '2027',
+		PARTITION VALUE = '2028',
+		PARTITION VALUE = '2029',
+		PARTITION VALUE = '2030'
+	);
+
+/*
+CAMPOS DE LA TABLA FUENTE: EKKO
+--------------------------------------------------------------------------------------------------
+Nombre campo                    |Denom.campo                                                 |
+--------------------------------------------------------------------------------------------------
+MANDT                            |Mandante                                                    |
+EBELN                            |Documento compras                                           |
+BUKRS                            |Sociedad                                                    |
+BSTYP                            |Tp.documento compras                                        |
+BSART                            |Cl.documento compras                                        |
+BSAKZ                            |Indicador de control                                        |
+LOEKZ                            |Indicador de borrado                                        |
+STATU                            |Status                                                      |
+AEDAT                            |Creado el                                                   |
+ERNAM                            |Creado por                                                  |
+PINCR                            |Intervalo posición                                          |
+LPONR                            |Última posición                                             |
+LIFNR                            |Proveedor                                                   |
+SPRAS                            |Clave de idioma                                             |
+ZTERM                            |Condiciones de pago                                         |
+ZBD1T                            |Pago en                                                     |
+ZBD2T                            |Pago en                                                     |
+ZBD3T                            |Pago en                                                     |
+ZBD1P                            |% dto.pronto pago 1                                         |
+ZBD2P                            |Porcentaje DPP 2                                            |
+EKORG                            |Organización compras                                        |
+EKGRP                            |Grupo de compras                                            |
+WAERS                            |Moneda                                                      |
+WKURS                            |Tipo cambio moneda                                          |
+KUFIX                            |Tipo cambio fijado                                          |
+BEDAT                            |Fecha documento                                             |
+KDATB                            |In.período validez                                          |
+KDATE                            |Fin período validez                                         |
+BWBDT                            |Plazo de licitación                                         |
+ANGDT                            |Plazo de oferta                                             |
+BNDDT                            |Plazo vinculante                                            |
+GWLDT                            |Garantía                                                    |
+AUSNR                            |Licitación                                                  |
+ANGNR                            |Oferta                                                      |
+IHRAN                            |Fecha de la oferta                                          |
+IHREZ                            |Referencia                                                  |
+VERKF                            |Vendedor/a                                                  |
+TELF1                            |Teléfono                                                    |
+LLIEF                            |Prov.suministrador                                          |
+KUNNR                            |Cliente                                                     |
+KONNR                            |Contrato marco                                              |
+ABGRU                            |Campo no utilizado                                          |
+AUTLF                            |Suministro completo                                         |
+WEAKT                            |Mensaje-EM                                                  |
+RESWK                            |Centro suministrador                                        |
+LBLIF                            |Proveedor receptor                                          |
+INCO1                            |Incoterms                                                   |
+INCO2                            |Incoterms, parte 2                                          |
+KTWRT                            |Val.prev.(niv.cab.)                                         |
+SUBMI                            |Licitación                                                  |
+KNUMV                            |Nº condición docum.                                         |
+KALSM                            |Esquema                                                     |
+STAFO                            |Grupo actualización                                         |
+LIFRE                            |Emisor de factura                                           |
+EXNUM                            |Nº datos comercio exterior                                  |
+UNSEZ                            |Nuestra referencia                                          |
+LOGSY                            |Sistema lógico                                              |
+UPINC                            |Interv.subposición                                          |
+STAKO                            |Cond.temporales                                             |
+FRGGR                            |Grupo de liberación                                         |
+FRGSX                            |Estrategia liberac.                                         |
+FRGKE                            |Ind.liberación                                              |
+FRGZU                            |Estado liberación                                           |
+FRGRL                            |Relevante p.liber.                                          |
+LANDS                            |País p. declar.fiscal                                       |
+LPHIS                            |Doc.orden entrega                                           |
+ADRNR                            |Nº dirección                                                |
+STCEG_L                          |País N.I.F.                                                 |
+STCEG                            |N.I.F. comunitario                                          |
+ABSGR                            |Motivo de rechazo                                           |
+ADDNR                            |Número de documento                                         |
+KORNR                            |CorrecProvisDiversas                                        |
+MEMORY                           |incompleto                                                  |
+PROCSTAT                         |Status tratamiento doc.                                     |
+RLWRT                            |Valor total liberación                                      |
+REVNO                            |Versión                                                     |
+SCMPROC                          |SCMPROC                                                     |
+REASON_CODE                      |Código de causas                                            |
+MEMORYTYPE                       |Datos incompletos                                           |
+RETTP                            |Retención                                                   |
+RETPC                            |Retención en porcentaje                                     |
+DPTYP                            |Anticipo                                                    |
+DPPCT                            |Porcentaje anticipo                                         |
+DPAMT                            |Importe de anticipo                                         |
+DPDAT                            |Fecha vencimiento de anticipo                               |
+MSR_ID                           |Número ID de proceso                                        |
+HIERARCHY_EXISTS                 |Parte jerarquía pedido abierto                              |
+THRESHOLD_EXISTS                 |Valor umbral para tipos de cambio                           |
+LEGAL_CONTRACT                   |Número de pedido abierto legal                              |
+DESCRIPTION                      |Nombre de pedido abierto                                    |
+RELEASE_DATE                     |Fecha liberación pedido abierto                             |
+FORCE_ID                         |ID único 32                                                 |
+FORCE_CNT                        |Contador                                                    |
+RELOC_ID                         |ID del traslado                                             |
+RELOC_SEQ_ID                     |ID etapa traslado                                           |
+SOURCE_LOGSYS                    |Sistema lógico                                              |
+ROUTE                            |Ruta                                                        |
+POHF_TYPE                        |Tipo de documento                                           |
+EQ_EINDT                         |Misma fecha entrega                                         |
+EQ_WERKS                         |Mismo centro                                                |
+FIXPO                            |Indicador operación comercial fecha fija                    |
+EKGRP_ALLOW                      |Considerar grupo de compras                                 |
+WERKS_ALLOW                      |Considerar centro                                           |
+CONTRACT_ALLOW                   |Considerar pedidos abiertos                                 |
+PSTYP_ALLOW                      |Considerar tipo de posición                                 |
+FIXPO_ALLOW                      |Considerar operación comercial fe.fija                      |
+KEY_ID_ALLOW                     |Considerar presupuesto                                      |
+AUREL_ALLOW                      |Considerar relevancia tabla asignación                      |
+DELPER_ALLOW                     |Considerar período de entrega                               |
+EINDT_ALLOW                      |Considerar fecha de entrega                                 |
+LTSNR_ALLOW                      |Considerar surtido parcial de proveedor                     |
+OTB_LEVEL                        |Nivel verificación DPC                                      |
+OTB_COND_TYPE                    |Clase condición DPC                                         |
+KEY_ID                           |Número de presupuesto                                       |
+OTB_VALUE                        |Presupuesto necesario                                       |
+OTB_CURR                         |Moneda DPC                                                  |
+OTB_RES_VALUE                    |Presupuesto reservado                                       |
+OTB_SPEC_VALUE                   |Presup. liberación especial                                 |
+SPR_RSN_PROFILE                  |Perfil justificación DPC p.lib.especial                     |
+BUDG_TYPE                        |Clase de presupuesto                                        |
+OTB_STATUS                       |Status verificación DPC                                     |
+OTB_REASON                       |Justificación                                               |
+CHECK_TYPE                       |Clase de verificación OTB                                   |
+CON_OTB_REQ                      |Pedidos abiertos vincul.DPC                                 |
+CON_PREBOOK_LEV                  |Nivel de preadmisión pedidos abiertos                       |
+CON_DISTR_LEV                    |Distribución med.valor prev.o dat.pos.                      |
+--------------------------------------------------------------------------------------------------
+
+*/

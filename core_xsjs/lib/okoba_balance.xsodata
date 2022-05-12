@@ -1,0 +1,1 @@
+service{"KOBA_BALANCE_VIEW" keys("SOCIEDAD", "PERIODO", "LEDGER", "CUENTA", "CUENTA_T");}

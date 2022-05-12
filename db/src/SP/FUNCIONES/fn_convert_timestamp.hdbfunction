@@ -1,0 +1,21 @@
+FUNCTION "fn_convert_timestamp"(TIMESTMP DECIMAL(15,0))
+ RETURNS FECHA_HORA LONGDATE 
+ LANGUAGE SQLSCRIPT READS SQL DATA AS
+ BEGIN
+/*****************************     
+    	Scrip bajo el formato de funciones en SAP HANA: https://help.sap.com/viewer/de2486ee947e43e684d39702027f8a94/2.0.03/en-US/2fc6d7beebd14c579457092e91519082.html
+        Convierte en formato Fecha/Hora el Time Stamp de la COEP
+        
+        1900/01/01 = 32874
+        
+        https://answers.sap.com/questions/3533599/index.html
+		TIMESTMP = ( COEP-TIMESTMP DIV 10000 ) + SY-TZONE.
+		TIMESTMP = TIMESTMP + 86400.
+		TIME = TIMESTMP MOD 86400.
+		DATE = '19900101' + TIMESTMP DIV 86400.        
+ 
+    ****************************/
+    FECHA_HORA = ADD_DAYS(TO_DATE('19000101'),32874+Round(:TIMESTMP/864000000,0)); 
+    FECHA_HORA = add_seconds(FECHA_HORA,MOD((:TIMESTMP/10000 + 86400),86400));
+    
+END;

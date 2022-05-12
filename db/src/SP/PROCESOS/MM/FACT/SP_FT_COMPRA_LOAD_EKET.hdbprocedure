@@ -1,0 +1,63 @@
+PROCEDURE "SP_FT_COMPRA_LOAD_EKET"(pTipoCarga VARCHAR(1),pPeriodo INT, pPart_ID SMALLINT)
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+	Carga de compras
+	Fecha de Creación: 30/03/2020
+	Fecha de Modificación: 02/04/2020
+	Creado por: CORG-MREDONDO
+	Modifica:
+	Motivo cambio: Manejo de Deltas
+	
+	Stage table: STG_ABAP_EKPO
+	Hecho destino: FT_EKPO
+	
+	pEBELN_DESDE NVARCHAR(10),pEBELN_HASTA NVARCHAR(10),pFECHA_INICIO NVARCHAR(8),pFECHA_FIN NVARCHAR(8)
+   *************************************/
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+    
+	--Otros campos relevantes no solicitados:
+	--EREKZ, --Final Invoice Indicator
+	--BANFN, --Purchase Requisition Number
+	--BNFPO, --Item Number of Purchase Requisition
+	--ETENR	 --Schedule Line Counter	
+	--ETENR = '0002' Solo vienen items para el KZZ (Sol. Traslado de Ped.) 
+	--ELDAT = Goods Receipt End Date
+	
+	--Se excluyen las fechas de entrega de los documentos KZZ (Sol. Traslado de Ped. CEDI->Tienda).
+
+	--Los datos de entrega están filtrados para EKORG = '6A00' AND ELIKZ ='X'
+	TENTREGA = 		SELECT 	ROW_NUMBER() OVER (PARTITION BY STG.EBELN, STG.EBELP ORDER BY STG.BEDAT Desc) ULTIMO_REGISTRO,
+							STG.EBELN, 
+							STG.EBELP,
+							STG.BEDAT,
+							cast(TO_VARCHAR(COMPRA.FE_AEDAT,'YYYYMM') as int) PERIODO,
+							COMPRA.CD_EJERCICIO EJERCICIO,
+							STG.EINDT, --Item Delivery Date
+							STG.SLFDT  --Delivery Date Relevant for Statistics
+					FROM STG_ABAP_EKET STG
+					INNER JOIN DIM_COMPRA COMPRA
+						ON COMPRA.CD_EBELN = STG.EBELN
+					WHERE STG.ETENR = '0001'
+					AND cast(TO_VARCHAR(COMPRA.FE_AEDAT,'YYYYMM') as int) = :pPeriodo;
+	
+	--Actualización de la Fecha de Entrega
+	MERGE INTO FT_COMPRA PARTITION(:pPart_ID) A
+	USING :TENTREGA F ON A.CD_EBELN 		= F.EBELN 
+					 AND A.CD_ITEM 			= F.EBELP 
+					 AND A.CD_PERIODO		= F.PERIODO
+	WHEN MATCHED AND ULTIMO_REGISTRO=1 THEN UPDATE 
+			SET FE_EINDT	= F.EINDT, 
+				FE_SLFDT	= F.SLFDT;
+	COMMIT;
+	
+	INSERT INTO ETL_CONTROL_CARGUE(TABLA,TIPO_CARGA,FECHA_CARGA,BUKRS,GJAHR,BLART,BELNR_DESDE,BELNR_HASTA,ULTIMA_FECHA,REGISTROS_PROCESADOS)
+	select 'FT_COMPRA_EKET',:pTipoCarga,add_seconds(now(),-18000),'6A00',Max(EJERCICIO),'',Min(EBELN),Max(EBELN),Max(F.BEDAT),Count(EBELN)
+	from :TENTREGA F ;
+	
+	COMMIT;
+	
+END

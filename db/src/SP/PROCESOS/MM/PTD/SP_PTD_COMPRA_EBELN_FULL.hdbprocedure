@@ -1,0 +1,56 @@
+PROCEDURE "SP_PTD_COMPRA_EBELN_FULL"(pDesde VARCHAR(10), pHasta VARCHAR(10))
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+      Cargue full de reango de consecutivos de las compras
+      Ejecutado de forma manual
+
+	  Consecutivos: 45* Compras BSART = 'NB', 46* BSART = 'ZDEV' , 470* Importaciones,  478* traslados EKGRP = 'KZZ' BSART = 'ZUB','ZUI' , 48 BSART = 'ZSER' 	
+	  Ejemplo:
+	 CALL SP_PTD_COMPRA_EBELN_FULL('4500949692','4500989670'); 	
+   *************************************/
+   
+ 	--Declaración de Cursores de fechas con rangos de consecutivos, periodos y particiones de compras a actualizar
+ 	
+ 	--Fechas y consecutivos que cambiaron
+	DECLARE CURSOR cursor_compras_modificadas FOR
+	SELECT DIM.FE_AEDAT,ETl.PERIODO,ETL.PART_ID, substring(DIM.CD_EBELN,1,5) Cons, Min(DIM.CD_EBELN) DESDE, Max(DIM.CD_EBELN) HASTA, Count(DIM.CD_EBELN) Cantidad
+	FROM DIM_COMPRA DIM 
+	INNER JOIN ETL_PARTICIONES ETL 
+			ON ETL.PERIODO = TO_CHAR(DIM.FE_AEDAT,'YYYYMM')
+			AND ETL.TABLA = 'FT_COMPRA'
+	WHERE DIM.CD_EBELN BETWEEN :pDesde AND :pHasta
+	GROUP BY ETl.PERIODO,ETL.PART_ID,DIM.FE_AEDAT,substring(DIM.CD_EBELN,1,5);
+	
+	--Periodos que cambiaron
+	DECLARE CURSOR cursor_compras_modificadas_periodos FOR
+	SELECT ETl.PERIODO,ETL.PART_ID
+	FROM DIM_COMPRA DIM 
+	INNER JOIN ETL_PARTICIONES ETL 
+			ON ETL.PERIODO = TO_CHAR(DIM.FE_AEDAT,'YYYYMM')
+			AND ETL.TABLA = 'FT_COMPRA'
+	WHERE DIM.CD_EBELN BETWEEN :pDesde AND :pHasta		
+	GROUP BY ETl.PERIODO,ETL.PART_ID;
+	
+	--Inicio de los procesos de actualización
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+       
+	TRUNCATE TABLE STG_ABAP_EKPO;
+	TRUNCATE TABLE STG_ABAP_EKET;
+
+	--Para cada rango de hasta 99 mil consecutivos se insertan los datos en las tablas de stage:
+	FOR cur_compra_modificada_row AS cursor_compras_modificadas DO	
+		"SP_STG_EKPO_LOAD_V003"('F',cur_compra_modificada_row.DESDE, cur_compra_modificada_row.HASTA);
+		"SP_STG_EKET_LOAD_V003"('F',cur_compra_modificada_row.DESDE, cur_compra_modificada_row.HASTA);
+	END FOR;
+	
+	--Para periodo que cambia se actualiza la FACT TABLE y el Inventario Recibido
+	FOR cur_compra_per_modificada_row AS cursor_compras_modificadas_periodos DO 
+		 "SP_FT_COMPRA_LOAD_EKPO"('F',cur_compra_per_modificada_row.PERIODO, cur_compra_per_modificada_row.PART_ID);
+		 "SP_FT_COMPRA_LOAD_EKET"('F',cur_compra_per_modificada_row.PERIODO, cur_compra_per_modificada_row.PART_ID);
+	END FOR;
+	
+END	

@@ -1,0 +1,131 @@
+PROCEDURE "SP_PTD_FT_MONTHLY"(pPeriodo varchar(6) )
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+   Persiste la información de la FT_MONTHLY que luego se consulta en los excels de Monthly
+   *************************************/
+   
+   -- Se fija si el parametro de Periodo esta completo y sino lo genera con Mes Actual y Mes anterior
+   
+	DECLARE pFechaDesde date;
+	DECLARE pFechaHasta date;
+	
+	IF :pPeriodo ='' 
+	THEN
+		pFechaDesde  = LAST_DAY(ADD_MONTHS(CURRENT_DATE,-1));
+		pFechaHasta  = LAST_DAY(CURRENT_DATE);
+	ELSE
+	   	pFechaDesde  = LAST_DAY(TO_VARCHAR(:pPeriodo)||'01');
+		pFechaHasta  = LAST_DAY(TO_VARCHAR(:pPeriodo)||'01');
+	END IF;
+   
+   
+   -- Borra la información previa
+   
+	DELETE FROM FT_MONTHLY
+	WHERE CD_PERIODO between :pFechaDesde and :pFechaHasta;
+	
+	COMMIT;
+   
+   
+   -- Carga la información ya asociada a un CEBE
+   
+	INSERT INTO FT_MONTHLY
+		(CD_PERIODO, CD_DW_CEBE, ID_CONCEPTO, CONCEPTO, ID_ACTIVIDAD, ACTIVIDAD, FLAG_DIST, SALDO)
+	SELECT 
+		F.MES,
+		CE.CD_DW_CEBE,
+		F.CONCEPTO_KPI,
+		F.CONCEPTO_PYG,
+		F.ACTIVIDAD_ID, 
+		F.ACTIVIDAD,
+		'',
+		SUM(F.SALDO) 
+	FROM KOBA_MONTHLY_V001 F
+	JOIN DIM_CEBE_PRCTR CE on F.CENTRO_BENEFICIO = CE.CD_CEBE
+	WHERE F.MES = :pFechaDesde 
+	  AND F.SALDO <> 0 
+	  AND F.STORE <> 0
+	GROUP BY F.MES,
+		CE.CD_DW_CEBE,
+		F.CONCEPTO_KPI,
+		F.CONCEPTO_PYG,
+		F.ACTIVIDAD_ID, 
+		F.ACTIVIDAD;
+	
+	IF :pPeriodo ='' 
+	THEN
+		INSERT INTO FT_MONTHLY
+			(CD_PERIODO, CD_DW_CEBE, ID_CONCEPTO, CONCEPTO, ID_ACTIVIDAD, ACTIVIDAD, FLAG_DIST, SALDO)
+		SELECT 
+			F.MES,
+			CE.CD_DW_CEBE,
+			F.CONCEPTO_KPI,
+			F.CONCEPTO_PYG,
+			F.ACTIVIDAD_ID, 
+			F.ACTIVIDAD,
+			'',
+			SUM(F.SALDO) 
+		FROM KOBA_MONTHLY_V001 F
+		JOIN DIM_CEBE_PRCTR CE on F.CENTRO_BENEFICIO = CE.CD_CEBE
+		WHERE F.MES = :pFechaHasta
+		  AND F.SALDO <> 0 
+		  AND F.STORE <> 0
+		GROUP BY F.MES,
+			CE.CD_DW_CEBE,
+			F.CONCEPTO_KPI,
+			F.CONCEPTO_PYG,
+			F.ACTIVIDAD_ID, 
+			F.ACTIVIDAD;
+	END IF;	
+		
+   -- Carga la información que es distribuida en todos los cebes en base al % de participacion en la Region
+   
+	
+	INSERT INTO FT_MONTHLY
+		(CD_PERIODO, CD_DW_CEBE, ID_CONCEPTO, CONCEPTO, ID_ACTIVIDAD, ACTIVIDAD, FLAG_DIST, SALDO)
+	SELECT 
+		F.FECHA AS CD_PERIODO,
+		F.CD_DW_CEBE,
+		F.ID_CONCEPTO,
+		F.CONCEPTO_PYG,
+		F.ID_ACTIVIDAD,
+		F.ACTIVIDAD,
+		'X' AS FLAG_DIST,
+		SUM(F.VALOR_GASTO) AS SALDO
+	FROM KOBA_MONTHLY_GASTOS F
+	WHERE F.FECHA = :pFechaDesde 
+	and F.CD_DW_CEBE is not null
+	GROUP BY F.FECHA,
+		F.CD_DW_CEBE,
+		F.ID_CONCEPTO,
+		F.CONCEPTO_PYG,
+		F.ID_ACTIVIDAD,
+		F.ACTIVIDAD;
+	
+	IF :pPeriodo ='' 
+	THEN
+		INSERT INTO FT_MONTHLY
+			(CD_PERIODO, CD_DW_CEBE, ID_CONCEPTO, CONCEPTO, ID_ACTIVIDAD, ACTIVIDAD, FLAG_DIST, SALDO)
+		SELECT 
+			F.FECHA AS CD_PERIODO,
+			F.CD_DW_CEBE,
+			F.ID_CONCEPTO,
+			F.CONCEPTO_PYG,
+			F.ID_ACTIVIDAD,
+			F.ACTIVIDAD,
+			'X' AS FLAG_DIST,
+			SUM(F.VALOR_GASTO) AS SALDO
+		FROM KOBA_MONTHLY_GASTOS F
+		WHERE F.FECHA = :pFechaHasta
+		and F.CD_DW_CEBE is not null
+		GROUP BY F.FECHA,
+			F.CD_DW_CEBE,
+			F.ID_CONCEPTO,
+			F.CONCEPTO_PYG,
+			F.ID_ACTIVIDAD,
+			F.ACTIVIDAD;
+	END IF;
+END

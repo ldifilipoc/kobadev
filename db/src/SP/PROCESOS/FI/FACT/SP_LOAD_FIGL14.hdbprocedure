@@ -1,0 +1,224 @@
+PROCEDURE "SP_LOAD_FIGL14"()
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+	Carga de partidas individuales de Finanzas
+	Fecha de Creación:02/12/2019
+	Creado por: CORG-JPIMIENTA
+	Descripción: Este proceso se apalanca de la tarea de replicación RT_0FI_GL_14, el cual está configurado para que periodicamente cargue datos a un área de stage.
+				 Posterior al cargue de la stage, se ejecuta periodicamente otra tarea que guarda los datos definitivos en una FACT Table.
+				 Este proceso borra la stage después de cargar los datos a la Fact Table.
+				 La tarea de replicación RT_0FI_GL_14 no carga documentos del POS I1 o X1, ya que estos son cargados por el proceso de carga de SP_PTD_FIGLITEM_DELTA.
+				 
+	Motivo cambio:	05/04/2020 CORG. Se agrega instrucción para actualizar el centro de beneficio en el encabezado de documento FI para facilitar el cargue de la COEP para KOBA
+					05/11/2020 CORG. Se retira MERGE en FT_FIGLITEM por mayor consumo de memoria. Se reemplaza por ITEMS=-1, control en encabezado BKPF para identificar si ya está o no el detalle.
+	Stage table: STG_0FI_GL_14
+	Hecho destino: FT_FIGLITEM
+	Agendamiento: En SAP CPI-DI, 2_P_FINANZAS.  Actualización de datos maestros escenciales son previos a este proceso.
+   *************************************/
+    DECLARE n int;
+    DECLARE pDesde bigint;
+    DECLARE pHasta bigint;
+    DECLARE pTimeStamp1 DECIMAL(15);
+    DECLARE pTimeStamp2 DECIMAL(15);
+    DECLARE pDia DATE;
+    DECLARE pCantidad INT;
+    DECLARE pEjercicio INT;
+    DECLARE Consecutivo INT;
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+
+	--Se verifica si existe un nuevo centro de costos, de beenficio o cuenta contable antes de seguir.
+	--Este paso es redundante porque previamente se han cargado los datos maestros, sin embargo se realiza un doble check.
+	/*	
+	--Se obtiene el máximo consecutivo ingresado en el maestro de CEBE
+	select Max(CD_DW_CEBE) into Consecutivo from "DIM_CEBE_PRCTR";
+	
+	--Nuevos CEBE
+	INSERT INTO DIM_CEBE_PRCTR(CD_DW_CEBE, CD_CEBE,NM_CEBE,NM_CEBE_ST,CD_EMPRESA)
+	SELECT :Consecutivo + ROW_NUMBER() OVER (ORDER BY PRCTR) Consecutivo, PRCTR,PRCTR,PRCTR,CO_EMPRESA
+	FROM (	SELECT DISTINCT PRCTR , EMP.CO_EMPRESA
+			FROM STG_0FI_GL_14 STG 	
+			INNER JOIN DIM_EMPRESA EMP ON STG.BUKRS = EMP.CD_EMPRESA
+			LEFT JOIN DIM_CEBE_PRCTR D 	ON D.CD_CEBE = STG.PRCTR 
+			WHERE D.CD_DW_CEBE IS NULL) NUEVOS;
+	
+	
+	COMMIT;
+	
+	--Nuevas cuentas
+	SELECT Max(CD_DW_CUENTA) INTO Consecutivo FROM DIM_CUENTA;
+	
+	insert into DIM_CUENTA(CD_DW_CUENTA, CD_CUENTA,NM_CUENTA,CD_TIPO_CUENTA,CD_CLASE, NM_CLASE, CD_GRUPOCUENTA,CD_CONCEPTO,NM_CONCEPTO,TIPO_INFORME)
+	select	 C.CD_CUENTA, C.NM_CUENTA,
+			(case substr(C.CD_CUENTA,1,1) when '1' then 'AST' 
+			when '2' then 'LEQ' when '3' then 'LEQ' when '4' then 'INC' when '5' then 'EXP' when '6' then 'EXP' when '7' then 'EXP'
+			else 'NFI' end) CD_TIPO_CUENTA,
+			substr(C.CD_CUENTA,0,1), 
+			(CASE substr(C.CD_CUENTA,0,1) 
+				WHEN '1' THEN 'ACTIVO' 
+				WHEN '2' THEN 'PASIVO' 
+				WHEN '3' THEN 'PATRIMONIO' 
+				WHEN '4' THEN 'INGRESO' 
+				WHEN '5' THEN 'GASTO' 
+				WHEN '6' THEN 'COSTO'
+			END), 
+			substr(C.CD_CUENTA,0,2),'N.A','N.A',
+			(case when substr(C.CD_CUENTA,1,1) IN ('1','2','3') then 'B' else 'P' end)
+	from (	SELECT DISTINCT HKONT CD_CUENTA, HKONT NM_CUENTA
+			FROM STG_0FI_GL_14 STG 
+			LEFT JOIN DIM_CUENTA CTA 
+				ON CTA.CD_CUENTA = STG.HKONT 
+			WHERE CTA.CD_DW_CUENTA IS NULL) C;
+	COMMIT;
+	
+	--Nuevos CECOS
+	select Max(CD_DW_CECO) into Consecutivo from "DIM_CECO";
+	
+	INSERT INTO "DIM_CECO"(CD_DW_CECO,CD_CECO,"CD_EMPRESA","NM_CECO","NM_CECO_ST","FE_DATETO","FE_DATEFROM","FE_CREACION", CD_JERARQUIA3)
+	select :Consecutivo + ROW_NUMBER() OVER (ORDER BY KOSTL) Consecutivo,
+			KOSTL, '6A00', KOSTL, KOSTL , '20000101' , '20991231' ,'20991231',''
+	from (		
+	select DISTINCT KOSTL
+	FROM STG_0FI_GL_14 STG 
+	LEFT JOIN DIM_CECO CECO
+		ON ((CECO.CD_CECO = STG.KOSTL))
+	WHERE NOT STG.KOSTL='' AND CECO.CD_DW_CECO IS NULL) NUEVOS;
+	COMMIT;
+
+	
+	--No se validan los nuevos documentos financieros, ya que el paso previo en el ETL los crea y si existen nuevos queda pendiente para en otra corrida cargarlo.
+
+	--Por control se obtienen los timestamp y la cantidad de documentos a cargar.
+	Select Min("TIMESTAMP"), Max("TIMESTAMP"), Max(BUDAT), Count(Distinct BELNR), CAST(min(GJAHR) AS INT)
+	into pTimeStamp1, pTimeStamp2, pDia, pCantidad, pEjercicio
+	FROM STG_0FI_GL_14;
+	--WHERE GJAHR='2021' AND MONAT='06';
+
+	--Las partidas invididuales a cargar se almacena en una variable temporal.
+	Partidas_Individuales =
+	SELECT 	DOC.CD_DW_BKPF, 
+			STG.DOCLN, 
+			substring(STG.BUDAT,1,6) PERIODO, 
+			28 CD_DW_EMPRESA,
+			DOC.CD_BLART,
+			Min(CTA.CD_DW_CUENTA) CD_DW_CUENTA, 
+			Min(CECO.CD_DW_CECO) CD_DW_CECO, 
+			Min(CEBE.CD_DW_CEBE) CD_DW_CEBE, 
+			Max(DOC.ITEMS) ITEMS,
+			Max(STG.WERKS) WERKS, 
+			Max(STG.ANLN1) ANLN1, 
+			Max(STG.LIFNR) LIFNR, 
+			Max(STG.KUNNR) KUNNR, 
+			Max(STG.EBELN) EBELN, 
+			Max(CASE WHEN STG.EBELP = '' THEN 0 ELSE TO_INT(STG.EBELP) END) CD_EBELP, 
+			Max(STG.VBELN) VBELN, 
+			Max(STG.XREF1) XREF1, 
+			Max(STG.XREF2) XREF2, 
+			Max(CASE WHEN STG.BLART IN ('I1','X1','WA','DZ') AND STG.XREF1 LIKE '222______' THEN '' ELSE STG.XREF3 END) REF3, --Cuando son ventas del POS, no es un tercero, es el mismo PRCTR/CEBE,   
+			Max(STG.AUFNR) AUFNR, 
+			Max(STG.AUGBL) AUGBL, 
+			Max(STG.ZUONR) ZUONR, 
+			Max(STG.BSCHL) BSCHL, 
+			Max(STG.BUDAT) BUDAT, 
+			Max(STG.SGTXT) SGTXT, 
+			Max(STG.PS_POSID) PS_POSID, 
+			Max(STG.SHKZG) SHKZG, 
+			Max(STG.DMBTR) DMBTR, 
+			Max(STG."TIMESTAMP") TIMESTMP,
+			Max(STG.PRCTR) PRCTR
+	FROM STG_0FI_GL_14 STG 
+	INNER JOIN DIM_DOCFI DOC 
+		ON DOC.CD_BELNR = STG.BELNR 
+		AND DOC.CD_EJERCICIO = TO_INT(STG.GJAHR)
+	INNER JOIN DIM_CUENTA CTA 
+		ON CTA.CD_CUENTA = STG.HKONT  	
+	INNER JOIN DIM_CEBE_PRCTR CEBE 
+		ON CEBE.CD_CEBE = STG.PRCTR
+	INNER JOIN DIM_CECO CECO
+		ON ((CECO.CD_CECO = STG.KOSTL AND NOT STG.KOSTL='')  OR (CECO.CD_CECO = STG.PRCTR AND STG.KOSTL=''))
+	WHERE (BLART != 'I1' AND BLART != 'X1' AND BLART != 'WA') --Se excluyen documentos de Venta o Inventario que se cargan en otro proceso
+	AND DOC.ITEMS <1 --Documentos nuevos que no han sido cargados previamente
+ 	GROUP BY DOC.CD_DW_BKPF, STG.DOCLN, STG.BUDAT, DOC.CD_BLART;	
+
+	COMMIT;
+
+	INSERT INTO FT_FIGLITEM
+		(CD_DW_BELNR, CD_DW_BUZEI, CD_PERIODO, CD_DW_EMPRESA, CD_DW_CUENTA, CD_DW_CECO, CD_DW_CEBE,  
+		 CD_WERKS, CD_ANLN1, CD_LIFNR, CD_KUNNR, CD_EBELN, CD_EBELP, CD_VBELN, XREF1, XREF2, XREF3, 
+		 CD_AUFNR, CD_AUGBL, ZUONR, BSCHL, FE_BUDAT, SGTXT, PS_POSID, CD_DRCRK, VL_HSL)
+	SELECT CD_DW_BKPF, DOCLN, PERIODO, 28, A.CD_DW_CUENTA, A.CD_DW_CECO, A.CD_DW_CEBE, 
+			WERKS, ANLN1, LIFNR, KUNNR, EBELN, A.CD_EBELP, VBELN, A.XREF1, A.XREF2, REF3,
+			AUFNR, AUGBL, A.ZUONR, A.BSCHL, BUDAT, A.SGTXT, A.PS_POSID, SHKZG, DMBTR 
+	FROM :Partidas_Individuales A;
+	--LEFT JOIN FT_FIGLITEM B ON B.CD_DW_BELNR = A.CD_DW_BKPF AND B.CD_DW_BUZEI = A.DOCLN AND B.CD_PERIODO = A.PERIODO
+	--WHERE ITEMS<1 AND B.CD_DW_BELNR IS NULL AND A.PERIODO='202106';
+	--WHERE ITEMS<1;	--Solo se cargan los nuevos documentos financieros.;
+	
+	--Actualización de la cantidad de posiciones de los documentos POS
+	MERGE INTO DIM_DOCFI DIM
+	USING  (select  CD_DW_BKPF, Count(CD_DW_BKPF) Cantidad, Max(TIMESTMP) LAST_TIMESTMP, Max(PRCTR) PRCTR, Max(CD_BLART) CD_BLART, Max(CD_DW_CEBE) CD_DW_CB
+			FROM :Partidas_Individuales D
+			WHERE ITEMS<1
+			GROUP BY CD_DW_BKPF) Det
+		ON Det.CD_DW_BKPF = DIM.CD_DW_BKPF
+	WHEN MATCHED THEN UPDATE 
+	SET ITEMS	 = Det.Cantidad, 
+		TIMESTMP = Det.LAST_TIMESTMP,
+		CD_DW_CEBE=(case when Det.CD_BLART = 'I1' OR Det.CD_BLART = 'X1' THEN Det.CD_DW_CB END),
+		CD_CEBE   =(case when Det.CD_BLART = 'I1' OR Det.CD_BLART = 'X1' THEN Det.PRCTR END);
+	COMMIT;
+
+	--Registros Compensados
+	Compensado = 
+	SELECT 	DOC.CD_DW_BKPF CD_DW_BELNR, 
+			STG.DOCLN CD_DOCNL, 
+			Max(STG.BUZEI) CD_BUZEI,
+			substring(STG.BUDAT,1,4) CD_EJERCICIO,
+			substring(STG.BUDAT,1,6) CD_PERIODO, 
+			28 CD_DW_EMPRESA,
+			Max(STG.BUDAT) FE_BUDAT,  
+			Max(STG.AUGBL) CD_AUGBL, 
+			Max(STG.AUGDT) FE_AUGDT,
+			Max(STG.AGZEI) CD_AGZEI,
+			Max(CTA.CD_DW_CUENTA) CD_DW_HKONT,
+			Max(STG.XREF1) XREF1, 
+			Max(STG.XREF3) XREF3,			
+			Max(STG.DMBTR) VL_DMBTR 
+	FROM STG_0FI_GL_14 STG 
+	INNER JOIN DIM_DOCFI DOC 
+		ON DOC.CD_BELNR = STG.BELNR 
+		AND DOC.CD_EJERCICIO = STG.GJAHR		
+	INNER JOIN DIM_CUENTA CTA 
+		ON CTA.CD_CUENTA = STG.HKONT  	
+	INNER JOIN DIM_CEBE_PRCTR CEBE 
+		ON CEBE.CD_CEBE = STG.PRCTR
+	INNER JOIN DIM_CECO CECO
+		ON ((CECO.CD_CECO = STG.KOSTL AND NOT STG.KOSTL='')  OR (CECO.CD_CECO = STG.PRCTR AND STG.KOSTL=''))	
+	WHERE (BLART != 'I1' AND BLART != 'X1' AND BLART != 'WA') --Se excluyen documentos de Venta o Inventario que se cargan en otro proceso
+	AND STG.AUGBL !=''	
+ 	GROUP BY DOC.CD_DW_BKPF, STG.DOCLN, STG.BUDAT, DOC.CD_BLART;
+
+	INSERT INTO FT_BSEG_COMPENSADO
+	(CD_DW_BELNR, CD_DOCNL, CD_BUZEI, CD_EJERCICIO, CD_PERIODO, CD_DW_EMPRESA, FE_BUDAT, CD_AUGBL, FE_AUGDT, CD_AGZEI, CD_DW_HKONT, XREF1, XREF3, VL_DMBTR)
+	SELECT	STG.CD_DW_BELNR, STG.CD_DOCNL, STG.CD_BUZEI, STG.CD_EJERCICIO, STG.CD_PERIODO, STG.CD_DW_EMPRESA, STG.FE_BUDAT, 
+			STG.CD_AUGBL, STG.FE_AUGDT, STG.CD_AGZEI, STG.CD_DW_HKONT, STG.XREF1, STG.XREF3, STG.VL_DMBTR
+	FROM :Compensado STG
+	LEFT JOIN FT_BSEG_COMPENSADO FT
+		ON FT.CD_DW_BELNR = STG.CD_DW_BELNR
+		AND FT.CD_DOCNL = STG.CD_DOCNL
+		AND FT.CD_EJERCICIO = STG.CD_EJERCICIO
+	WHERE FT.CD_DW_BELNR IS NULL;
+ 	COMMIT;
+
+	DELETE FROM STG_0FI_GL_14 STG  
+	WHERE "TIMESTAMP" BETWEEN :pTimeStamp1 AND :pTimeStamp2;
+	COMMIT;
+	
+	insert into ETL_CONTROL_CARGUE(TABLA,FECHA_CARGA,TIPO_CARGA,BUKRS,GJAHR,BELNR_DESDE,BELNR_HASTA,TIMESTMP_DESDE,TIMESTMP_HASTA,ULTIMA_FECHA,REGISTROS_PROCESADOS)
+	values ('0FI_GL_14',now(),'D','6A00',pEjercicio,:pDesde,:pHasta, :pTimeStamp1, :pTimeStamp2,:pDia,:pCantidad);
+	COMMIT;
+	*/
+END

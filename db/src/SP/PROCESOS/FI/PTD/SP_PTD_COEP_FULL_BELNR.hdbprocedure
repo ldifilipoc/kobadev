@@ -1,0 +1,71 @@
+PROCEDURE "SP_PTD_COEP_BELNR"(pREFGJ VARCHAR(4),pREFBN1 VARCHAR(10), pREFBN2 VARCHAR(10) )
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+    PTD: Proceso de transferencia de datos
+	Carga de Ingresos por material en modo full por rango de documento FI pREFBN1-pREFBN2
+	Fecha de Creación:02/12/2019
+	Creado por: CORG-JPIMIENTA
+	Modifica:CORG-JPIMIENTA
+	Motivo cambio:	11/02/2020: Rango de tiempos del timestamp de la COEP
+					El formato del timestamp de la COEP difiere al FAGLFLEXA (YYYYMMDDHH24MISS) y está explicado en el siguiente blog:
+			        https://answers.sap.com/questions/3533599/index.html
+					TIMESTMP = ( COEP-TIMESTMP DIV 10000 ) + SY-TZONE.
+					TIMESTMP = TIMESTMP + 86400.
+					TIME = TIMESTMP MOD 86400.
+					DATE = '19900101' + TIMESTMP DIV 86400.     
+					BUKRS: Se agrega como parte del criterio de consulta
+	Stage table:  STG_COEP, STG_ZTFI_DTS_IMP
+	Hecho destino: FT_COEP
+   *************************************/
+    Declare V_SQL NVARCHAR(500);
+    Declare pEmpresa smallint = 28; --28 = KOBA
+	Declare SociedadCO VARCHAR(4)='6100';
+	Declare pTipoCarga Varchar(1)='F';
+	Declare n int;
+	Declare pBELNR1 varchar(15);
+	Declare pBELNR2 varchar(15);
+	Declare pDESDE1 DATE;
+	Declare pHASTA2 DATE;
+	Declare Rango VARCHAR(200);
+	Declare pBUKRS VARCHAR(4) = '6A00';
+	
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+
+	truncate table STG_ABAP_COBK;
+	truncate table STG_ABAP_COEP;
+	truncate table STG_ABAP_ZTFI_DTS_IMP;
+	
+	--PASO 01. Carga del encabezado de documentos CO según el rango de documento financiero solicitado
+	V_SQL=	'insert into KOBA_HDI_DB_1.STG_ABAP_COBK(KOKRS,BELNR,TIMESTMP,BLDAT,BUDAT,USNAM,BLTXT,STFLG,STOKZ,REFBN,REFGJ,BLART,KURST,KWAER) '||
+			'SELECT KOKRS,BELNR,TIMESTMP,BLDAT,BUDAT,USNAM,BLTXT,STFLG,STOKZ,REFBN,REFGJ,BLART,KURST,KWAER '||
+			'FROM KOBA_HDI_DB_1.VT_ABAP_COBK '||
+			'WHERE REFBN>='''||:pREFBN1||''' AND REFBN<='''||:pREFBN2||''' AND REFGJ='''||:pREFGJ||''' AND KOKRS='''||:SociedadCO||'''';
+	EXECUTE IMMEDIATE :V_SQL;
+	COMMIT;
+	--Se obtiene el rango de documento CO correspondiente al rango de documentos FI
+	select Min(BELNR), Max(BELNR) into pBELNR1, pBELNR2 from STG_ABAP_COBK;
+	
+	V_SQL=	'insert into KOBA_HDI_DB_1.STG_ABAP_COEP(KOKRS,BELNR,BUZEI,GSBER,PERIO,KSTAR,REFBZ,WERKS,MATNR,REFBZ_FI,WTGBTR,MBGBTR,BEKNZ,TIMESTMP) '||
+			'SELECT KOKRS,BELNR,BUZEI,GSBER,PERIO,KSTAR,REFBZ,WERKS,MATNR,REFBZ_FI,WTGBTR,MBGBTR,BEKNZ,TIMESTMP '||
+			'FROM KOBA_HDI_DB_1.VT_ABAP_COEP '||
+			'WHERE BELNR>='''||:pBELNR1||''' AND BELNR<='''||:pBELNR2||''' AND (KSTAR=''4135150000'' OR KSTAR=''4175350000'' OR KSTAR=''4175350200'') AND KOKRS='''||:SociedadCO||'''';
+	EXECUTE IMMEDIATE V_SQL;
+	COMMIT;
+	
+	--Se insertan los documentos recibidos del POS con el IVA, Impoconsumo y Costo unitario por material
+	RANGO= 'WHERE BUKRS = ''6A00''  AND GJAHR='''||:pREFGJ||''' AND BELNR>='''||:pREFBN1||''' AND BELNR<='''||:pREFBN2||'''';
+	V_SQL=	'insert into KOBA_HDI_DB_1.STG_ABAP_ZTFI_DTS_IMP(BUKRS,BELNR,GJAHR,BUZEI,WW010,WW011,WW012,WW013,DMBTR,PRCTR) '||
+			'SELECT BUKRS,BELNR,GJAHR,BUZEI,WW010,WW011,WW012,WW013,DMBTR,PRCTR '||
+			'FROM KOBA_HDI_DB_1.VT_ABAP_ZTFI_DTS_IMP '||:RANGO;
+	EXECUTE IMMEDIATE V_SQL;
+	COMMIT;
+			
+	--PASO 6: Se carga en la fact table
+	CALL SP_FT_COEP_LOAD_V001('F');
+	CALL SP_FT_COEP_ZTPOS_LOAD;
+	
+END

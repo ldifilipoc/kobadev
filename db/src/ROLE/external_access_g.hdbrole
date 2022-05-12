@@ -1,0 +1,23 @@
+{
+  "role": {
+    "name": "koba::external_access_g#",
+    "schema_privileges": [
+      {
+        "reference": "KOBA_HDI_DB_1",
+        "privileges": [
+          "SELECT",
+          "SELECT METADATA"
+        ],
+        "privileges_with_grant_option": [
+          "ALTER",
+          "DELETE",
+          "SELECT",
+          "SELECT METADATA",
+          "INSERT",
+          "EXECUTE",
+          "UPDATE"
+        ]
+      }
+    ]
+  }
+}

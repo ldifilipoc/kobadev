@@ -1,0 +1,89 @@
+PROCEDURE "SP_PTD_COEP_ZTPOS_FULL"()
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+   PTD: Proceso de transferencia de datos
+	Carga de Ingresos por material en modo delta (desde la ultima fecha/hora de carga)
+	Fecha de Creación:02/12/2019
+	Creado por: CORG-JPIMIENTA
+	Modifica:CORG-JPIMIENTA
+	Motivo cambio:	04/04/2020 Se divide en dos el proceso por retrazos en la carga de los costos e impuestos de la tabla STG_ZTFI_DTS_IMP
+					
+	Stage table:  STG_ZTFI_DTS_IMP
+	Hecho destino: FT_COEP_ZTPOS
+
+	PROCESO ALTERNATIVO QUE NO TOMA LOS DOCUMENTOS CARGADOS EN LA DIM_DOCFI en su POS_ITEMS
+   *************************************/
+	Declare i int=0;
+	Declare M bigint=0;
+	Declare pT_DESDE decimal(15,0);
+	Declare pT_HASTA decimal(15,0);
+	Declare pGJAHR Varchar(4);
+	Declare pFECHA_CARGA Datetime;
+	Declare pTabla VARCHAR(50)= 'ZTFI_DTS_IMP';
+	Declare pReg bigint = 0;
+	Declare pBLART varchar(2) = 'I1';
+	
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+       
+	
+	--Cantidad de Cargas o rangos de documento POS pendientes
+	select count(BELNR_DESDE) Registro
+	into  pReg
+	from ETL_CONTROL_CARGUE 
+	where TABLA    = :pTabla
+	  and BLART    = :pBLART
+	  and CARGA_POS='P';
+	  
+	FOR i IN 1..:pReg DO
+			
+		select top 1 FECHA_CARGA, GJAHR 
+		into pFECHA_CARGA, pGJAHR
+		from ETL_CONTROL_CARGUE 
+		where TABLA    = :pTabla
+		  and BLART    = :pBLART
+		  and CARGA_POS='P' --Cargas o rangos de documento POS pendientes
+		order by  FECHA_CARGA, BELNR_DESDE;
+		
+		--limpieza de las tablas de stage
+		truncate table STG_ABAP_ZTFI_DTS_IMP;
+
+		--Procesa/carga para cada rango de documentos FI y clase de documento el impuesto de IVA, Impoconsumo y Costo unitario en la tabla ZTFI_DTS_IMP_LOAD	
+		CALL SP_STG_ZTFI_DTS_IMP_LOAD_V001;
+
+		select sum(Cantidad)
+		into  M
+		from (
+		select	count(F.BELNR) Cantidad
+		from STG_ABAP_ZTFI_DTS_IMP F 
+		inner join DIM_DOCFI B 
+				on B.CD_BELNR		=F.BELNR 
+				AND B.CD_EJERCICIO	=F.GJAHR 
+				AND B.CD_DW_EMPRESA	=28
+		
+		group by B.CD_EJERCICIO
+		union 
+		select 0 Cantidad
+		from TDUMMY
+		) Det;
+		
+		--Se actualizan los datos de Costo, IVA, Impoconsumo en la FT_COEP_ZTPOS provenientes de la tabla ZTFI_DTS_IMP_LOAD
+		CALL SP_FT_COEP_ZTPOS_LOAD_FULL;
+
+		
+		update ETL_CONTROL_CARGUE 
+		set CARGA_POS='X',
+			REGISTROS_PROCESADOS=:M
+		where TABLA=:pTabla
+		AND GJAHR=:pGJAHR 
+		AND BLART=:pBLART 
+		AND FECHA_CARGA = :pFECHA_CARGA;
+		commit;
+		i = :i + 1;
+		
+	END FOR;
+
+END

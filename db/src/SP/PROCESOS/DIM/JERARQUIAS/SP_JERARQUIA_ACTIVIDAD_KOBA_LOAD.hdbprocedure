@@ -1,0 +1,65 @@
+PROCEDURE "SP_JERARQUIA_ACTIVIDAD_KOBA_LOAD"( )
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+	declare ControllingArea nvarchar(10):= '6100';
+	declare Tipo_Jerarquia nvarchar(4):='0106'; -- CENTRO BENEFICIO
+	declare Consecutivo int;
+	declare Sociedad nvarchar(4):='6A00';
+	declare Jerarquia_Actividades nvarchar(10):= 'REPORT2PYG';
+	--DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    --   SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;	
+/**************************
+	Jerarquia de Actividades REPORT2PYG
+***************************/
+	REPORTPYG =	SELECT P.SUBSETNAME,P.SEQNR,C.CD_CEBE,T.DESCRIPT
+				FROM "STG_SETNODE" P
+				INNER JOIN "STG_SETLEAF" H
+					ON H.SETNAME = P.SUBSETNAME AND P.SETCLASS = H.SETCLASS AND P.SUBCLASS = H.SUBCLASS
+				INNER JOIN "DIM_CEBE_PRCTR" C 
+					ON C.CD_CEBE BETWEEN H.VALFROM AND H.VALTO 
+				INNER JOIN "STG_SETHEADER" T 
+					ON P.SUBSETNAME = T.SETNAME AND T.SETCLASS = P.SETCLASS AND T.SUBCLASS =P.SUBCLASS
+				WHERE P.SETCLASS = :Tipo_Jerarquia and P.SUBCLASS =:ControllingArea AND P.SETNAME = :Jerarquia_Actividades;
+	
+	--Se inicializa la Jerarquía de actividades			
+	UPDATE DIM_CEBE_PRCTR SET CD_JERARQUIA2=null, NM_JERARQUIA2=null, CD_ACTIVIDAD=null,NM_ACTIVIDAD=null; 
+
+	--Actividades de importación
+	 update DIM_CEBE_PRCTR SET CD_JERARQUIA2='IMPORT_TR', NM_JERARQUIA2='IMPORTS',CD_ACTIVIDAD='IMPORT_TR', NM_ACTIVIDAD='IMPORTS'
+	 where CD_EMPRESA = :ControllingArea AND CD_CEBE LIKE '__I%';
+	 
+	--Tiendas todos los que en el 5 caracter tenga T y R STORE_TR
+	 update DIM_CEBE_PRCTR SET CD_JERARQUIA2='STORE_TR', NM_JERARQUIA2='STORES',CD_ACTIVIDAD='STORE_TR', NM_ACTIVIDAD='STORES'
+	 where CD_EMPRESA = :ControllingArea AND (CD_CEBE LIKE '____T_____' OR CD_CEBE LIKE '____R_____') AND CD_CEBE<>'SUPERVI_TR';
+	 --Tiendas todos los que en el 5 caracter tenga C LOGISTIC
+	 update DIM_CEBE_PRCTR SET CD_JERARQUIA2='LOGIST_TR', NM_JERARQUIA2='LOGISTIC',CD_ACTIVIDAD='LOGIST_TR', NM_ACTIVIDAD='LOGISTIC'
+	 where CD_EMPRESA = :ControllingArea AND CD_CEBE LIKE '____C_____';
+	 --Tiendas todos los que en el 5 caracter tenga S SUPERVISION 
+	 update DIM_CEBE_PRCTR SET CD_JERARQUIA2='SUPERVI_TR', NM_JERARQUIA2='SUPERVISION',CD_ACTIVIDAD='SUPERVI_TR', NM_ACTIVIDAD='SUPERVISION'
+	 where CD_EMPRESA = :ControllingArea AND CD_CEBE LIKE '____S_____';
+	 --Tiendas todos los que en el 5 caracter tenga A REGIONAL_A
+	 update DIM_CEBE_PRCTR SET CD_JERARQUIA2='REGADM_TR', NM_JERARQUIA2='REGIONAL ADMIN',CD_ACTIVIDAD='REGADM_TR', NM_ACTIVIDAD='REGIONAL ADMIN'
+	 where CD_EMPRESA = :ControllingArea AND CD_CEBE LIKE '____A_____';
+
+
+	MERGE INTO DIM_CEBE_PRCTR C
+	USING :REPORTPYG J
+	ON J.CD_CEBE = C.CD_CEBE
+	WHEN MATCHED THEN UPDATE 
+	SET CD_JERARQUIA2 = J.SUBSETNAME,CD_ACTIVIDAD=J.SUBSETNAME, NM_JERARQUIA2 = J.DESCRIPT,NM_ACTIVIDAD=J.DESCRIPT;
+	
+	--Se obtiene el último consecutivo para crear los nuevos nodos
+	select Max(CD_DW_CEBE) into Consecutivo
+	from DIM_CEBE_PRCTR;
+	
+	--Se crean los nuevos nodos
+	insert into DIM_CEBE_PRCTR(CD_DW_CEBE, CD_CEBE, NM_CEBE, NM_CEBE_ST, FE_DATETO, FE_DATEFROM,FE_CREACION,CD_EMPRESA,FL_ESNODO)
+	select :Consecutivo + ROW_NUMBER() OVER (ORDER BY P.SUBSETNAME),P.SUBSETNAME,T.DESCRIPT,T.DESCRIPT,'29991231','20000101','29991231',:ControllingArea,'S'
+	FROM "STG_SETNODE" P
+	INNER JOIN "STG_SETHEADER" T ON P.SUBSETNAME = T.SETNAME AND T.SETCLASS = P.SETCLASS AND T.SUBCLASS =P.SUBCLASS
+	WHERE P.SETCLASS = :Tipo_Jerarquia and P.SUBCLASS =:ControllingArea AND P.SETNAME = :Jerarquia_Actividades
+	AND not P.SUBSETNAME IN (select CD_CEBE from DIM_CEBE_PRCTR); --Con esta instrucción se excluyen los nodos ya creados	
+
+END

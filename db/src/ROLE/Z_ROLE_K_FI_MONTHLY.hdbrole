@@ -1,0 +1,42 @@
+{
+  "role": {
+    "name": "Z_ROLE_K_FI_MONTHLY",
+    "object_privileges": [
+      {
+        "name": "DIM_CEBE_CLIENTE",
+        "type": "TABLE",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "KOBA_MONTHLY",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "DIM_CEBE_PRCTR",
+        "type": "TABLE",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "KOBA_MONTHLY_V001",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "FT_MONTHLY",
+        "type": "TABLE",
+        "privileges": [
+          "SELECT"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "role": {
+    "name": "Z_ROLE_K_FI_AM",
+    "object_privileges": [
+      {
+        "name": "KOBA_BALANCE_DETALLE_VIEW",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "KOBA_BALANCE_VIEW",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "VW_KOBA_CONSOLIDADO_ACTIVO",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "KOBA_ACTIVO_FIJO",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "KOBA_BALANCE_ARRENDAMIENTOS_VIEW",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "VW_KOBA_FI_MSEG",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "VW_KOBA_FI_MSEG_CLASE_DOC",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "VW_KOBA_CONSOLIDADO_ACTIVO_V1",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      },
+      {
+        "name": "DIM_CUENTA",
+        "type": "VIEW",
+        "privileges": [
+          "SELECT"
+        ]
+      }
+    ]
+  }
+}

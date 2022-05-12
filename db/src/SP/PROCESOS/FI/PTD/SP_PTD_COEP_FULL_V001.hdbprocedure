@@ -1,0 +1,86 @@
+PROCEDURE "SP_PTD_COEP_FULL_V001"(pFechaDesde Date, pFechaHasta date)
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+   PTD: Proceso de transferencia de datos
+	Carga de Ingresos por material en modo full (en el rango de fecha de creación pFechaDesde - pFechaHasta )
+	Fecha de Creación:02/12/2019
+	Creado por: CORG-JPIMIENTA
+	Modifica:CORG-JPIMIENTA
+	Motivo cambio:	11/02/2020: Rango de tiempos del timestamp de la COEP
+					El formato del timestamp de la COEP difiere al FAGLFLEXA (YYYYMMDDHH24MISS) y está explicado en el siguiente blog:
+			        https://answers.sap.com/questions/3533599/index.html
+					TIMESTMP = ( COEP-TIMESTMP DIV 10000 ) + SY-TZONE.
+					TIMESTMP = TIMESTMP + 86400.
+					TIME = TIMESTMP MOD 86400.
+					DATE = '19900101' + TIMESTMP DIV 86400.     
+					
+	Stage table:  STG_ABAP_COEP
+	Hecho destino: FT_COEP
+   *************************************/
+    Declare V_SQL NVARCHAR(500);
+    Declare pEmpresa smallint = 28; --Consecutivo interno de KOBA en la bodega de datos
+	Declare rango bigint = 864000000;	--Rango de 24 horas máximo
+	Declare pTIMESTAMP1 varchar(15);
+	Declare pTIMESTAMP2 varchar(15);
+	Declare SociedadCO VARCHAR(4) = '6100';
+	Declare pDESDE1 DATE;
+	Declare pHASTA2 DATE;	
+	Declare j bigint =0;
+	Declare i bigint =0;
+	Declare M bigint;
+	Declare v int =1;
+	Declare pBUKRS VARCHAR(4)='6A00';
+	Declare pTipoCarga Varchar(1)='F';
+	
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+
+	--Esta función devuelve la fecha/hora a timestamp en el formato de la COEP
+	i= "fn_invert_timestamp"(pFechaDesde, '00:00:0').TIMESTMP;
+	M= "fn_invert_timestamp"(pFechaHasta, '23:59:59').TIMESTMP;
+	pTIMESTAMP1= TO_VARCHAR(i);
+	pTIMESTAMP2= TO_VARCHAR(M);
+	
+	truncate table STG_ABAP_COBK;
+	
+	--PASO 01. Carga del encabezado de documentos CO
+	V_SQL=	'insert into KOBA_HDI_DB_1.STG_ABAP_COBK(KOKRS,BELNR,TIMESTMP,BLDAT,BUDAT,USNAM,BLTXT,STFLG,STOKZ,REFBN,REFGJ,BLART,KURST,KWAER) '||
+			'SELECT KOKRS,BELNR,TIMESTMP,BLDAT,BUDAT,USNAM,BLTXT,STFLG,STOKZ,REFBN,REFGJ,BLART,KURST,KWAER '||
+			'FROM KOBA_HDI_DB_1.VT_ABAP_COBK '||
+			'WHERE TIMESTMP>='||:pTIMESTAMP1||' AND TIMESTMP<='||:pTIMESTAMP2||' AND KOKRS='''||:SociedadCO||'''';
+	EXECUTE IMMEDIATE :V_SQL;
+	COMMIT;
+	
+	--PASO 02: Se obtiene el ultimo timestamp ingresado para el tipo de carga delta para el control del while
+	--El proceso se repite por cada día que se desea cargar
+	while :i<=:M and :v>0 do
+	
+		--PASO 3: Se obtiene el ultimpo timestamp en formato varchar
+		pTIMESTAMP1= TO_VARCHAR(i);
+		pTIMESTAMP2= TO_VARCHAR(i + :rango);
+		
+		--PASO 4: limpieza de las tablas de stage
+		truncate table STG_ABAP_COEP;
+		
+		--PASO 5: Se ejecuta la carga en el Stage
+		CALL SP_STG_COEP_LOAD_V001(:pTipoCarga,:pTIMESTAMP1,:pTIMESTAMP2);
+
+		--PASO 6: Se carga en la fact table
+		CALL SP_FT_COEP_LOAD_V001(:pTipoCarga);
+		
+		--El proceso termina cuando i supera el límite de timestamp que para el proceso delta es la Fecha/Hora Actual 
+		i = :i + :rango;
+		
+	end while;
+	
+	--Se inserta el último Timestamp para asegurar que no se pierda la carga delta de la COEP
+	insert into "ETL_CONTROL_CARGUE"("TABLA","FECHA_CARGA","BUKRS","TIPO_CARGA","REGISTROS_PROCESADOS","TIMESTMP_HASTA")
+	select "TABLA",Now(),'6A00','D',0,Max("TIMESTMP_HASTA")
+	from "ETL_CONTROL_CARGUE"
+	where TABLA='FT_COEP' 
+	group by "TABLA","BUKRS";
+	
+END

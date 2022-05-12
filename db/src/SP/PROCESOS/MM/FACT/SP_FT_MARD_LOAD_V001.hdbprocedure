@@ -1,0 +1,30 @@
+PROCEDURE "SP_FT_MARD_LOAD_V001"()
+  LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+	Carga de MARD
+	Fecha de Creación: 
+	Fecha de Modificación: 12/05/2020
+	Creado por: CORG-MREDONDO
+	Modifica:
+	Motivo cambio: Manejo de Deltas
+	
+	Stage table: STG_ABAP_MARD
+	Hecho destino: FT_MARD
+   *************************************/
+
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+      
+    --DELETE FROM FT_MARD WHERE CD_EJERCICIO=:pLFGJA AND CD_MES=:pLFMON; 
+    --COMMIT;
+    
+	INSERT INTO FT_MARD ("CD_DW_MATERIAL", "CD_CENTRO", "CD_LGORT", "CD_EJERCICIO", "CD_MES", "NU_LABST")
+	SELECT DM."CD_DW_MATERIAL", "WERKS", "LGORT", "LFGJA", "LFMON", "LABST"
+	FROM STG_ABAP_MARD FT 
+	INNER JOIN DIM_MATERIAL DM ON FT.MATNR=DM.CD_MATERIAL;
+	COMMIT;
+	
+END

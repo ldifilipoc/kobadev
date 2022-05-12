@@ -1,0 +1,82 @@
+PROCEDURE SP_STG_SETJERARQUIAS
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+	DECLARE SociedadCO VARCHAR(4) = '6100';
+/**************************
+	Se Actualizan las tablas de Stage de las Jerarquías de CO: Cargue FULL
+	
+	SAP mantiene 3 tablas para grupos de jerarquía CO estándar: SETHEADER,SETNODE y SETLEAF. 
+	SETHEADER mantiene los nodos TOP de las agrupaciones con SETTYPE de valor S o B. 
+	Si SETTYPE = S, esto indica que el nodo TOP tiene subgrupos, entonces se toma el 
+	SETNAME de la tabla SETHEADER y se filtra la tabla SETNODE con el SETNAME. 
+	
+	En estas tablas hay diferentes agrupaciones como:
+	
+	SETCLASS='0101' Para Centros de Costo (No utilizada)						+ SUBCLASS=SociedadCO
+	SETCLASS='0102' Para Jerarquía de elementos de costo/cuentas contables		+ SUBCLASS=PUCV
+	SETCLASS='0106' Para Centros de Beneficio (Espejo para CECO)				+ SUBCLASS=SociedadCO
+	
+	Si SETTYPE = B, entonces el TOP NODE corresponde con el último subgrupo y con el 
+	SETNAME correspondiente en la SETLEAF con la SETCLASS, SUBCLASS y SETNAME.
+
+	SUBCLASS en la tabla SETLEAF es la Sociedad CO: 6100,3100,2100,4100,1100,5100
+	Si SETCLASS=0101 entonces SUBCLASS='PUCV' que es el plan de cuentas
+	
+	SETNAME =	'JCB-GKOBA' (Jerarquía de CEBE), 'REPORT2PYG' (Jerarquía de actividades)
+				'PYG_KOBA'(Jerarquía del Montlhy)
+	SUBSETNAME= Otros y 'CLSDOC' Clases de documento que se incluyen en la suma del VAT
+	
+***************************/
+	Declare V_SQL NVARCHAR(500);
+	
+	--DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    --   SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+       
+	truncate table "STG_SETNODE";
+	truncate table "STG_SETLEAF";
+	truncate table "STG_SETHEADER";
+	
+	V_SQL=	'INSERT INTO KOBA_HDI_DB_1.STG_SETNODE(SETCLASS,SUBCLASS,SETNAME,LINEID,SUBSETCLS,SUBSETSCLS,SUBSETNAME,SEQNR) '||
+			'SELECT SETCLASS,SUBCLASS,SETNAME,LINEID,SUBSETCLS,SUBSETSCLS,SUBSETNAME,SEQNR '||
+			'FROM KOBA_HDI_DB_1.VT_SETNODE '||
+			'WHERE (SETCLASS=''0101'' AND SUBCLASS='''||:SociedadCO||''') '||
+			'   OR (SETCLASS=''0106'' AND SUBCLASS='''||:SociedadCO||''') '||
+			'   OR (SETCLASS=''0102'' AND SUBCLASS=''PUCV'') ';
+	EXECUTE IMMEDIATE V_SQL;
+	
+	V_SQL=	'INSERT INTO KOBA_HDI_DB_1.STG_SETLEAF(SETCLASS,SUBCLASS,SETNAME,LINEID,VALSIGN,VALOPTION,VALFROM,VALTO,SEQNR) '||
+			'SELECT SETCLASS,SUBCLASS,SETNAME,LINEID,VALSIGN,VALOPTION,VALFROM,VALTO,SEQNR '||
+			'FROM KOBA_HDI_DB_1.VT_ZSETLEAF ' ||
+			'WHERE (SETCLASS=''0101'' AND SUBCLASS='''||:SociedadCO||''') '||
+			'   OR (SETCLASS=''0106'' AND SUBCLASS='''||:SociedadCO||''') '||
+			'   OR (SETCLASS=''0102'' AND SUBCLASS=''PUCV'') ';
+	EXECUTE IMMEDIATE V_SQL;
+
+	V_SQL=	'INSERT INTO KOBA_HDI_DB_1.STG_SETHEADER(SETCLASS,SUBCLASS,SETNAME,DESCRIPT) '||
+			'SELECT SETCLASS,SUBCLASS,SETNAME,DESCRIPT '||
+			'FROM KOBA_HDI_DB_1.VT_SETHEADER '||
+			'WHERE LANGU=''S'' '||
+			'AND (   (SETCLASS=''0101'' AND SUBCLASS='''||:SociedadCO||''') '||
+			'     OR (SETCLASS=''0106'' AND SUBCLASS='''||:SociedadCO||''') '||
+			'     OR (SETCLASS=''0102'' AND SUBCLASS=''PUCV'')) ';
+	EXECUTE IMMEDIATE V_SQL;
+	
+	COMMIT;
+	
+	insert into ETL_CONTROL_CARGUE(TABLA,FECHA_CARGA,BUKRS,GJAHR,BELNR_DESDE,BELNR_HASTA,TIMESTMP_DESDE,TIMESTMP_HASTA,ULTIMA_FECHA,REGISTROS_PROCESADOS)
+	select 'STG_SETNODE',now(),'0000',Year(now()),'','',0,0,now(),Count(*)
+	from STG_SETNODE;
+	COMMIT;
+	
+	insert into ETL_CONTROL_CARGUE(TABLA,FECHA_CARGA,BUKRS,GJAHR,BELNR_DESDE,BELNR_HASTA,TIMESTMP_DESDE,TIMESTMP_HASTA,ULTIMA_FECHA,REGISTROS_PROCESADOS)
+	select 'STG_SETLEAF',now(),'0000',Year(now()),'','',0,0,now(),Count(*)
+	from STG_SETLEAF;
+	COMMIT;
+
+	insert into ETL_CONTROL_CARGUE(TABLA,FECHA_CARGA,BUKRS,GJAHR,BELNR_DESDE,BELNR_HASTA,TIMESTMP_DESDE,TIMESTMP_HASTA,ULTIMA_FECHA,REGISTROS_PROCESADOS)
+	select 'STG_SETHEADER',now(),'0000',Year(now()),'','',0,0,now(),Count(*)
+	from STG_SETHEADER;
+	COMMIT;	
+END

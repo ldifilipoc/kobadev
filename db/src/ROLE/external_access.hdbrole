@@ -1,0 +1,14 @@
+{
+  "role": {
+    "name": "external_access",
+    "schema_privileges": [
+      {
+        "reference": "KOBA_HDI_DB_1",
+        "privileges": [
+          "SELECT",
+          "SELECT METADATA"
+        ]
+      }
+    ]
+  }
+} 

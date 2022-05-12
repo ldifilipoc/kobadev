@@ -1,0 +1,161 @@
+PROCEDURE "SP_DIM_DOCFI_LOAD_V001"(pTipoCarga Varchar(1),pDesde date, pHasta date)
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+       Actualización del encabezado documento financiero
+       Fecha de Creación:19/11/2019
+       Fecha de Modificación:15/01/2020
+       Creado por: CORG-JPIMIENTA
+       Modifica:CORG-JPIMIENTA
+       Motivo cambio: Manejo de Deltas
+       
+       Tabla Virtual usada: VT_ABAP_BKPF (Creada por el replication task para cargue inicial)
+       Stage table: STG_BKPF
+       Dimensión: DIM_DOCFI
+       Agendamiento de carga: En SAP CPI-DI, Proceso 2_P_FINANZAS
+       
+       Este proceso puede ser ejecutado para carga Full o Delta.
+       El MERGE INTO asegura que el documento esté creado o de lo contrario se actualiza
+       Ejemplo del llamado del procedimiento:
+       
+       CALL KOBA_HDI_DB_1.SP_DIM_DOCFI_LOAD_V001('F','20201001','20201031')
+       ó desde el explorador de consultas del contenedor:
+       CALL SP_DIM_DOCFI_LOAD_V001('F','20201001','20201031')
+       
+       Se tomarán los documentos actualizados en ese rango de fecha según el campo CPUDT de la BKPF.
+       Para verificar después de ejecutar el proceso e identificar los documentos que no han sido cargados:
+       
+        SELECT CD_BELNR, CD_BLART, FE_BUDAT,FE_CPUDT, FE_CPUTM, USNAM, BKTXT, AWTYP
+		FROM KOBA_HDI_DB_1.DIM_DOCFI 
+		WHERE ITEMS = -1 AND CD_EJERCICIO = 2020;
+		
+		El campo ITEMS se actualiza cuando se insertan las posiciones del documento financiero.
+
+		Documentos repetidos pueden generar duplicidad en la cantidad de registros en las tablas de Hecho, por ejemplo, si se cargó accidentalmente información de otras compañías que tienen los mismos consecutvios.
+		Si ejecuta las consultas de forma independiente y manual, verique que en la dimensión no quedan registros repetidos
+		En cualquier caso que se requiera la búsqueda de documentos repetidos puede ejecutar esta consulta en la consola de SQL.
+		En caso de duplicidad de cifras, borre primero las transacciones del documento nuevo repetido (identifique por el consecutivo), después borre el documento
+		
+		select CD_BELNR,CD_DW_EMPRESA,CD_EJERCICIO, Count(CD_BELNR)
+		from KOBA_HDI_DB_1.DIM_DOCFI
+		group by CD_BELNR,CD_DW_EMPRESA,CD_EJERCICIO
+		having Count(*)>1; 
+	
+		El resultado de la consulta siempre debe ser vacío..
+		
+   *************************************/
+	Declare V_SQL NVARCHAR(2500);
+	Declare pCPUDT_DESDE VARCHAR(8);
+	Declare pULTIMA_FECHAHORA DATETIME;
+	Declare N int;
+	Declare pEmpresa smallint = 28;
+	Declare pBUKRS VARCHAR(4) = '6A00';
+	Declare CPUDT_Desde date;
+	Declare CPUDT_Hasta date;
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+    
+   	truncate table STG_BKPF;   
+	
+	IF :pTipoCarga='D' THEN
+	   --Ultima Fecha de ingreso
+		select top 1 TO_VARCHAR(ULTIMA_FECHA,'YYYYMMDD'),ULTIMA_FECHA into pCPUDT_DESDE,pULTIMA_FECHAHORA
+		from "ETL_CONTROL_CARGUE" 
+		where TABLA='BKPF' and BUKRS=:pBUKRS
+		order by ULTIMA_FECHA desc;
+		--Documentos creados o modificados en el rango de fecha
+		V_SQL = ' (CPUDT>='''||:pCPUDT_DESDE||''' OR AEDAT>='''||:pCPUDT_DESDE||''' ) ';
+	ELSE 
+		--Documentos creados o modificados en el rango de fecha
+		V_SQL = ' (CPUDT>='''||TO_VARCHAR(:pDesde,'YYYYMMDD')||''' AND CPUDT<='''||TO_VARCHAR(:pHasta,'YYYYMMDD')||''' OR AEDAT>='''||TO_VARCHAR(:pDesde,'YYYYMMDD')||''' AND AEDAT<='''||TO_VARCHAR(:pHasta,'YYYYMMDD')||''') ';
+	END IF;
+	
+	--String con el SQL que se ejecutará para la extracción de los datos desde la última fecha de carga (No se tiene en cuenta la hora porque la fuente no tiene TIMESTAMP)
+	V_SQL =	'INSERT INTO STG_BKPF (BUKRS,BELNR,GJAHR,BLART,BLDAT,BUDAT,MONAT,CPUDT,CPUTM,UPDDT,AEDAT,USNAM,BKTXT,WAERS,KURSF,BSTAT,AWTYP,AWKEY,XREF1_HD,XREF2_HD,XREVERSAL,RLDNR,STBLG,STJAH,TCODE,DBBLG,XBLNR) '||
+			'SELECT BUKRS,BELNR,GJAHR,BLART,BLDAT,BUDAT,MONAT,CPUDT,CPUTM,UPDDT,AEDAT,USNAM,BKTXT,WAERS,KURSF,BSTAT,AWTYP,AWKEY,XREF1_HD,XREF2_HD,XREVERSAL,RLDNR,STBLG,STJAH,TCODE,DBBLG,XBLNR '||
+			'FROM VT_ABAP_BKPF '||
+			'WHERE BUKRS=''6A00'' AND '||:V_SQL;
+	EXECUTE IMMEDIATE V_SQL;
+	commit;
+	
+	SELECT ifnull(Count(BELNR),0), Min(CPUDT),Max(CPUDT) 
+	INTO N,CPUDT_Desde,CPUDT_Hasta 
+	FROM STG_BKPF;
+	
+	IF :N>0 THEN
+		--Se insertan solo los documentos que cambiaron desde la última fecha de cargue
+		merge into DIM_DOCFI D
+		using STG_BKPF S
+		on D.CD_BELNR = S.BELNR AND D.CD_EJERCICIO=S.GJAHR AND D.CD_DW_EMPRESA=:pEmpresa
+		when matched then update set
+			D.FE_BLDAT=S.BLDAT,D.FE_BUDAT=S.BUDAT,D.FE_CPUDT=S.CPUDT,D.FE_CPUTM=S.CPUTM,D.USNAM=S.USNAM,D.BKTXT=S.BKTXT,D.WAERS=S.WAERS,D.KURSF=S.KURSF,
+			D.BSTAT=S.BSTAT,D.AWTYP=S.AWTYP,D.AWKEY=S.AWKEY,D.XREVERSAL=S.XREVERSAL,D.STBLG=S.STBLG,D.STJAH=S.STJAH,D.TCODE=S.TCODE, D.DBBLG=S.DBBLG,
+			D.XBLNR=S.XBLNR,
+			D.FE_AEDAT = S.AEDAT,
+			D.CD_MBLNR = (CASE WHEN S.AWTYP= 'MKPF' THEN substring(S.AWKEY,1,10) ELSE '' END),
+			D.FL_ANULADO = (CASE WHEN NOT S.STBLG='' THEN 'X' ELSE '' END) --Si es un documento que anula a otro, se marca
+		when not matched then insert ("CD_BELNR",CD_DW_EMPRESA,CD_EJERCICIO,"CD_BLART","FE_BLDAT","FE_BUDAT","FE_CPUDT","FE_CPUTM","FE_AEDAT","USNAM","XBLNR","BKTXT","WAERS","KURSF","BSTAT","AWTYP","AWKEY","XREVERSAL","STBLG","STJAH","TCODE","DBBLG", CD_MBLNR)
+		values (S."BELNR",:pEmpresa,S.GJAHR,S."BLART",S."BLDAT",S."BUDAT",S."CPUDT",S."CPUTM",S.AEDAT,S."USNAM",S."XBLNR",S."BKTXT",S."WAERS",S."KURSF",S."BSTAT",S."AWTYP",S."AWKEY",S."XREVERSAL",S."STBLG",S."STJAH",S."TCODE",S.DBBLG, (CASE WHEN S.AWTYP= 'MKPF' THEN substring(S.AWKEY,1,10) ELSE '' END));
+		commit;
+		
+		--Documentos anulados
+		--Indicator as to whether a document has been reversed ('1') or is a reversal document ('2')
+		CTE_ANULACIONES =SELECT E.CD_DW_EMPRESA, S.STBLG BELNR, TO_INT(S.STJAH) GJAHR  , S.BELNR STBLG, S.GJAHR STJAH  -->Documentos que reversan a otro documento
+						 FROM STG_BKPF S
+						 INNER JOIN DIM_EMPRESA E
+						 	ON E.CD_EMPRESA = S.BUKRS  --is a reversal document ('2')
+						 WHERE S.XREVERSAL='2';
+		--Si un documento anula a otro, se busca al otro y se marca como anulado				 
+		merge into DIM_DOCFI D
+		using :CTE_ANULACIONES S
+		on D.CD_BELNR = S.BELNR 
+			AND D.CD_EJERCICIO = S.GJAHR 
+			AND D.CD_DW_EMPRESA= S.CD_DW_EMPRESA
+		when matched then update 
+			SET D.XREVERSAL = '1',  D.STBLG = S.STBLG, D.STJAH = S.STJAH, D.FL_ANULADO = 'X';
+
+		--Se insertan los consecutivos nuevos pendientes de cargue
+		Pendientes_x_Cargar =	select  DIM.FE_CPUDT,		
+										DIM.CD_EJERCICIO,		
+										DIM.CD_BLART,
+										DIM.FE_CPUDT||' '||substring(Max(DIM.FE_CPUTM),1,2) ||':'||substring(Max(DIM.FE_CPUTM),3,2)||':'||substring(Max(DIM.FE_CPUTM),5,2) FECHA_CARGA,
+										Min(DIM.CD_BELNR) DESDE, 
+										Max(DIM.CD_BELNR) HASTA,
+										(CASE WHEN DIM.CD_BLART='RV' THEN 'BSEG_VBRK' ELSE 'FAGLFLEXA' END) TABLA
+								from DIM_DOCFI DIM
+								where DIM.FE_CPUDT BETWEEN :CPUDT_Desde AND :CPUDT_Hasta
+								AND ((DIM.ITEMS <1 AND DIM.CD_BLART in ('I1','WA'))
+									OR (DIM.CO_ITEMS <1 AND DIM.CD_BLART='RV'))
+								GROUP BY DIM.CD_BLART,DIM.CD_EJERCICIO,DIM.FE_CPUDT;
+		
+		insert into ETL_CONTROL_CARGUE(TABLA,ULTIMA_FECHA,BUKRS,GJAHR,BLART,FECHA_CARGA,BELNR_DESDE,BELNR_HASTA,CARGA_POS,TIPO_CARGA)
+		select  DIM.TABLA,DIM.FE_CPUDT,'6A00',DIM.CD_EJERCICIO,DIM.CD_BLART,DIM.FECHA_CARGA,DIM.DESDE, DIM.HASTA, 'P' CARGA_POS,	'D' TIPO_CARGA
+		from :Pendientes_x_Cargar DIM
+		left join ETL_CONTROL_CARGUE ETL   --Consecutivos o rangos que previamente no han sido insertados
+			on ETL.TABLA		= DIM.TABLA
+			and ETL.BUKRS		= '6A00'
+			and ETL.FECHA_CARGA = DIM.FECHA_CARGA
+			and ETL.BLART		= DIM.CD_BLART
+		where ETL.FECHA_CARGA is null;
+		
+		--Se ingresan los rangos para la clase de documento I1 que no han sido previamente insertados, para la carga del IVA del POS
+		insert into ETL_CONTROL_CARGUE(TABLA,ULTIMA_FECHA,BUKRS,GJAHR,BLART,FECHA_CARGA,BELNR_DESDE,BELNR_HASTA,CARGA_POS,TIPO_CARGA)
+		select  'ZTFI_DTS_IMP',DIM.FE_CPUDT,'6A00',DIM.CD_EJERCICIO,DIM.CD_BLART,DIM.FECHA_CARGA,DIM.DESDE, DIM.HASTA, 'P' CARGA_POS,	'D' TIPO_CARGA
+		from :Pendientes_x_Cargar DIM
+		left join ETL_CONTROL_CARGUE ETL   --Consecutivos o rangos que previamente no han sido insertados
+			on ETL.TABLA		= 'ZTFI_DTS_IMP'
+			and ETL.BUKRS		= '6A00'
+			and ETL.FECHA_CARGA = DIM.FECHA_CARGA
+			and ETL.BLART		= DIM.CD_BLART
+		where ETL.FECHA_CARGA is null AND DIM.CD_BLART = 'I1';
+			
+		insert into ETL_CONTROL_CARGUE	(TABLA,FECHA_CARGA,BUKRS,GJAHR,BELNR_DESDE,BELNR_HASTA,TIMESTMP_DESDE,TIMESTMP_HASTA,ULTIMA_FECHA,REGISTROS_PROCESADOS)
+		select 'BKPF',now(),:pBUKRS,Max(GJAHR),Min(BELNR),Max(BELNR),TO_VARCHAR(:pULTIMA_FECHAHORA,'YYYYMMDDHH24MISS'),TO_VARCHAR(Max(CONCAT(CPUDT,CPUTM)),'YYYYMMDDHH24MISS'),Max(CONCAT(CPUDT,CPUTM)),Count(BELNR) 
+		from STG_BKPF;
+		commit;
+	END IF;
+	
+
+END

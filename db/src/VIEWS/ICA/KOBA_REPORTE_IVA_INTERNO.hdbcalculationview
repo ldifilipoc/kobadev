@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Calculation:scenario xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:Calculation="http://www.sap.com/ndb/BiModelCalculation.ecore" id="KOBA_REPORTE_IVA_INTERNO" applyPrivilegeType="NONE" dataCategory="CUBE" schemaVersion="3.0" outputViewType="Aggregation" cacheInvalidationPeriod="NONE" enforceSqlExecution="false">
+<descriptions defaultDescription="KOBA_REPORTE_IVA_INTERNO"/>
+<localVariables/>
+<variableMappings/>
+<dataSources>
+  <DataSource id="FT_IMPUESTO">
+    <resourceUri>FT_IMPUESTO</resourceUri>
+  </DataSource>
+  <DataSource id="DIM_DOCFI">
+    <resourceUri>DIM_DOCFI</resourceUri>
+  </DataSource>
+  <DataSource id="DIM_CUENTA">
+    <resourceUri>DIM_CUENTA</resourceUri>
+  </DataSource>
+  <DataSource id="DIM_IMPUESTO">
+    <resourceUri>DIM_IMPUESTO</resourceUri>
+  </DataSource>
+</dataSources>
+<calculationViews>
+  <calculationView xsi:type="Calculation:ProjectionView" id="Projection_1">
+    <viewAttributes>
+      <viewAttribute id="CD_DW_BKPF"/>
+      <viewAttribute id="CD_ITEM"/>
+      <viewAttribute id="CD_IMPUESTO"/>
+      <viewAttribute id="CD_GIMPUESTO"/>
+      <viewAttribute id="VL_DEBITO"/>
+      <viewAttribute id="VL_CREDITO"/>
+      <viewAttribute id="CD_DW_BP"/>
+      <viewAttribute id="CD_DW_CUENTA"/>
+      <viewAttribute id="PC_TASA"/>
+      <viewAttribute id="CD_CALC"/>
+      <viewAttribute id="FL_IMPUESTO"/>
+    </viewAttributes>
+    <calculatedViewAttributes/>
+    <input node="FT_IMPUESTO"/>
+  </calculationView>
+  <calculationView xsi:type="Calculation:ProjectionView" id="Projection_2">
+    <viewAttributes>
+      <viewAttribute id="CD_DW_EMPRESA"/>
+      <viewAttribute id="CD_EJERCICIO"/>
+      <viewAttribute id="FE_BUDAT"/>
+      <viewAttribute id="CD_BELNR"/>
+      <viewAttribute id="CD_DW_BKPF"/>
+    </viewAttributes>
+    <calculatedViewAttributes/>
+    <input node="DIM_DOCFI"/>
+  </calculationView>
+  <calculationView xsi:type="Calculation:JoinView" id="Join_1" cardinality="CN_N" joinType="leftOuter">
+    <viewAttributes>
+      <viewAttribute id="CD_DW_BKPF" aggregationType="sum"/>
+      <viewAttribute id="CD_ITEM" aggregationType="sum"/>
+      <viewAttribute id="CD_IMPUESTO"/>
+      <viewAttribute id="CD_GIMPUESTO"/>
+      <viewAttribute id="VL_DEBITO" aggregationType="sum"/>
+      <viewAttribute id="VL_CREDITO" aggregationType="sum"/>
+      <viewAttribute id="CD_DW_BP" aggregationType="sum"/>
+      <viewAttribute id="CD_DW_CUENTA" aggregationType="sum"/>
+      <viewAttribute id="PC_TASA" aggregationType="sum"/>
+      <viewAttribute id="CD_CALC"/>
+      <viewAttribute id="FL_IMPUESTO"/>
+      <viewAttribute id="CD_EJERCICIO" aggregationType="sum"/>
+      <viewAttribute id="FE_BUDAT"/>
+      <viewAttribute id="CD_BELNR"/>
+      <viewAttribute id="CD_DW_EMPRESA" aggregationType="sum"/>
+    </viewAttributes>
+    <calculatedViewAttributes/>
+    <input node="Projection_1">
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_BKPF" source="CD_DW_BKPF"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_ITEM" source="CD_ITEM"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_IMPUESTO" source="CD_IMPUESTO"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_GIMPUESTO" source="CD_GIMPUESTO"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="VL_DEBITO" source="VL_DEBITO"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="VL_CREDITO" source="VL_CREDITO"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_BP" source="CD_DW_BP"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_CUENTA" source="CD_DW_CUENTA"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="PC_TASA" source="PC_TASA"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_CALC" source="CD_CALC"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="FL_IMPUESTO" source="FL_IMPUESTO"/>
+    </input>
+    <input node="Projection_2">
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_EJERCICIO" source="CD_EJERCICIO"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="FE_BUDAT" source="FE_BUDAT"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_BELNR" source="CD_BELNR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_EMPRESA" source="CD_DW_EMPRESA"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_BKPF" source="CD_DW_BKPF"/>
+    </input>
+    <joinAttribute name="CD_DW_BKPF"/>
+  </calculationView>
+  <calculationView xsi:type="Calculation:ProjectionView" id="Projection_3">
+    <viewAttributes>
+      <viewAttribute id="CD_DW_CUENTA"/>
+      <viewAttribute id="CD_CUENTA"/>
+    </viewAttributes>
+    <calculatedViewAttributes/>
+    <input node="DIM_CUENTA"/>
+  </calculationView>
+  <calculationView xsi:type="Calculation:JoinView" id="Join_2" cardinality="CN_N" joinType="inner">
+    <viewAttributes>
+      <viewAttribute id="CD_IMPUESTO"/>
+      <viewAttribute id="CD_GIMPUESTO"/>
+      <viewAttribute id="VL_DEBITO" aggregationType="sum"/>
+      <viewAttribute id="VL_CREDITO" aggregationType="sum"/>
+      <viewAttribute id="CD_DW_BP" aggregationType="sum"/>
+      <viewAttribute id="PC_TASA" aggregationType="sum"/>
+      <viewAttribute id="CD_CALC"/>
+      <viewAttribute id="FL_IMPUESTO"/>
+      <viewAttribute id="CD_EJERCICIO" aggregationType="sum"/>
+      <viewAttribute id="FE_BUDAT"/>
+      <viewAttribute id="CD_DW_EMPRESA" aggregationType="sum"/>
+      <viewAttribute id="CD_CUENTA"/>
+      <viewAttribute hidden="true" id="JOIN$CD_DW_CUENTA$CD_DW_CUENTA"/>
+    </viewAttributes>
+    <calculatedViewAttributes>
+      <calculatedViewAttribute id="MES" datatype="NVARCHAR" length="2" expressionLanguage="SQL">
+        <formula>LEFT(RIGHT(&quot;FE_BUDAT&quot;, 5), 2)</formula>
+      </calculatedViewAttribute>
+    </calculatedViewAttributes>
+    <input node="Join_1">
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_IMPUESTO" source="CD_IMPUESTO"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_GIMPUESTO" source="CD_GIMPUESTO"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="VL_DEBITO" source="VL_DEBITO"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="VL_CREDITO" source="VL_CREDITO"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_BP" source="CD_DW_BP"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="PC_TASA" source="PC_TASA"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_CALC" source="CD_CALC"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="FL_IMPUESTO" source="FL_IMPUESTO"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_EJERCICIO" source="CD_EJERCICIO"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="FE_BUDAT" source="FE_BUDAT"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_DW_EMPRESA" source="CD_DW_EMPRESA"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="JOIN$CD_DW_CUENTA$CD_DW_CUENTA" source="CD_DW_CUENTA"/>
+    </input>
+    <input node="Projection_3">
+      <mapping xsi:type="Calculation:AttributeMapping" target="CD_CUENTA" source="CD_CUENTA"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="JOIN$CD_DW_CUENTA$CD_DW_CUENTA" source="CD_DW_CUENTA"/>
+    </input>
+    <joinAttribute name="JOIN$CD_DW_CUENTA$CD_DW_CUENTA"/>
+  </calculationView>
+  <calculationView xsi:type="Calculation:ProjectionView" id="Projection_4">
+    <viewAttributes/>
+    <calculatedViewAttributes/>
+    <input node="DIM_IMPUESTO"/>
+  </calculationView>
+</calculationViews>
+<logicalModel id="Join_2">
+  <attributes>
+    <attribute id="CD_IMPUESTO" order="1" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="CD_IMPUESTO"/>
+      <keyMapping columnObjectName="Join_2" columnName="CD_IMPUESTO"/>
+    </attribute>
+    <attribute id="CD_GIMPUESTO" order="2" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="CD_GIMPUESTO"/>
+      <keyMapping columnObjectName="Join_2" columnName="CD_GIMPUESTO"/>
+    </attribute>
+    <attribute id="CD_DW_BP" order="5">
+      <descriptions defaultDescription="CD_DW_BP"/>
+      <keyMapping columnObjectName="Join_2" columnName="CD_DW_BP"/>
+    </attribute>
+    <attribute id="PC_TASA" order="6">
+      <descriptions defaultDescription="PC_TASA"/>
+      <keyMapping columnObjectName="Join_2" columnName="PC_TASA"/>
+    </attribute>
+    <attribute id="CD_CALC" order="7" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="CD_CALC"/>
+      <keyMapping columnObjectName="Join_2" columnName="CD_CALC"/>
+    </attribute>
+    <attribute id="FL_IMPUESTO" order="8" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="FL_IMPUESTO"/>
+      <keyMapping columnObjectName="Join_2" columnName="FL_IMPUESTO"/>
+    </attribute>
+    <attribute id="CD_EJERCICIO" order="9">
+      <descriptions defaultDescription="CD_EJERCICIO"/>
+      <keyMapping columnObjectName="Join_2" columnName="CD_EJERCICIO"/>
+    </attribute>
+    <attribute id="FE_BUDAT" hidden="true" order="10" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="FE_BUDAT"/>
+      <keyMapping columnObjectName="Join_2" columnName="FE_BUDAT"/>
+    </attribute>
+    <attribute id="CD_DW_EMPRESA" order="11">
+      <descriptions defaultDescription="CD_DW_EMPRESA"/>
+      <keyMapping columnObjectName="Join_2" columnName="CD_DW_EMPRESA"/>
+    </attribute>
+    <attribute id="CD_CUENTA" order="12" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="CD_CUENTA"/>
+      <keyMapping columnObjectName="Join_2" columnName="CD_CUENTA"/>
+    </attribute>
+    <attribute id="MES" order="13" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="MES"/>
+      <keyMapping columnObjectName="Join_2" columnName="MES"/>
+    </attribute>
+  </attributes>
+  <calculatedAttributes/>
+  <baseMeasures>
+    <measure id="VL_DEBITO" order="3" aggregationType="sum" measureType="simple">
+      <descriptions defaultDescription="VL_DEBITO"/>
+      <measureMapping columnObjectName="Join_2" columnName="VL_DEBITO"/>
+    </measure>
+    <measure id="VL_CREDITO" order="4" aggregationType="sum" measureType="simple">
+      <descriptions defaultDescription="VL_CREDITO"/>
+      <measureMapping columnObjectName="Join_2" columnName="VL_CREDITO"/>
+    </measure>
+  </baseMeasures>
+  <calculatedMeasures/>
+  <restrictedMeasures/>
+  <localDimensions/>
+</logicalModel>
+<layout>
+  <shapes>
+    <shape expanded="true" modelObjectName="Output" modelObjectNameSpace="MeasureGroup">
+      <upperLeftCorner x="100" y="105"/>
+    
+      <rectangleSize width="160"/>
+    </shape>
+  
+    <shape expanded="true" modelObjectName="Projection_1" modelObjectNameSpace="CalculationView">
+      <upperLeftCorner x="-111" y="513"/>
+      <rectangleSize height="30" width="160"/>
+    </shape>
+    <shape expanded="true" modelObjectName="Projection_2" modelObjectNameSpace="CalculationView">
+      <upperLeftCorner x="130" y="513"/>
+      <rectangleSize height="30" width="160"/>
+    </shape>
+    <shape expanded="true" modelObjectName="Join_1" modelObjectNameSpace="CalculationView">
+      <upperLeftCorner x="6" y="335"/>
+      <rectangleSize height="30" width="160"/>
+    </shape>
+    <shape modelObjectName="Projection_1" modelObjectNameSpace="Join_1" modelObjectType="JoinNodeInput">
+      <upperLeftCorner x="20" y="30"/>
+      <rectangleSize width="176.857421875"/>
+    </shape>
+    <shape modelObjectName="Projection_2" modelObjectNameSpace="Join_1" modelObjectType="JoinNodeInput">
+      <upperLeftCorner x="320" y="30"/>
+      <rectangleSize width="186.24072265625"/>
+    </shape>
+    <shape expanded="true" modelObjectName="Projection_3" modelObjectNameSpace="CalculationView">
+      <upperLeftCorner x="270" y="357"/>
+      <rectangleSize height="30" width="160"/>
+    </shape>
+    <shape expanded="true" modelObjectName="Join_2" modelObjectNameSpace="CalculationView">
+      <upperLeftCorner x="130" y="230"/>
+      <rectangleSize height="30" width="160"/>
+    </shape>
+    <shape modelObjectName="Join_1" modelObjectNameSpace="Join_2" modelObjectType="JoinNodeInput">
+      <upperLeftCorner x="20" y="30"/>
+      <rectangleSize width="186.24072265625"/>
+    </shape>
+    <shape modelObjectName="Projection_3" modelObjectNameSpace="Join_2" modelObjectType="JoinNodeInput">
+      <upperLeftCorner x="320" y="30"/>
+      <rectangleSize width="176.857421875"/>
+    </shape>
+    <shape expanded="true" modelObjectName="Projection_4" modelObjectNameSpace="CalculationView">
+      <upperLeftCorner x="477" y="483"/>
+      <rectangleSize height="30" width="160"/>
+    </shape>
+  </shapes>
+</layout>
+</Calculation:scenario>

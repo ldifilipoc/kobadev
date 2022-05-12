@@ -1,0 +1,40 @@
+PROCEDURE "SP_STG_FAGLFLEXA_LOAD_BELNR"(GJAHR VARCHAR(4), pDesde VARCHAR(10), pHasta VARCHAR(10))
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+	/*************************************
+	Carga de las partidas individuales de finanzas
+	Parémtros:	pEmpresa=28 para KOBA
+				pBUKRS=6A00 para KOBA
+				pTipoCarga='D' para Delta o 'F' para full
+				pDesde = BELNR Desde 
+				pHasta = BELNR Hasta 
+				RLDNR = 0L Libro contable
+	Fecha de Creación:02/12/2019
+	Fecha de Modificación:11/02/2020
+	Creado por: CORG-JPIMIENTA
+	Modifica:CORG-JPIMIENTA
+	Motivo cambio:	11/02/2020	Manejo de Deltas
+					05/04/2020	Join que asegura que no se inserten timestamp de partidas individuales cuyo encabezado de documento aun no ha sido creado
+								Si alguna partida individual no tiene encabezado no se inserta en la FACT TABLE
+	Tabla Virtual usada:	VT_ABAP_FAGLFLEXA (Detalle de partidas individuales)
+							
+	Las virtual table fueron creadas por el replication task para cargue inicial/full
+	Stage table: STG_ABAP_FAGLFLEXA
+	Hecho destino: FT_FIGLITEM
+	*************************************/
+	DECLARE V_SQL NVARCHAR(500);
+	
+	--DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    --  SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+       
+	--EXTRACCION DE LA FAGLFLEXA
+	V_SQL= 'INSERT INTO STG_ABAP_FAGLFLEXA(RBUKRS,GJAHR,DOCLN,BELNR,BUZEI,BSCHL,RTCUR,RACCT,RCNTR,PRCTR,HSL,OSL,RWCUR,BUDAT,TIMESTAMP,DRCRK) '||
+			'SELECT RBUKRS,GJAHR,DOCLN,BELNR,BUZEI,BSCHL,RTCUR,RACCT,RCNTR,PRCTR,HSL,OSL,RWCUR,BUDAT,TIMESTAMP,DRCRK '||
+			'FROM KOBA_HDI_DB_1.VT_ABAP_FAGLFLEXA '||
+			'WHERE RBUKRS=''6A00'' AND RLDNR=''0L'' AND GJAHR='''||:GJAHR||''' AND (BELNR>='''||:pDesde||''' AND BELNR<='''||:pHasta||''') ';	
+	EXECUTE IMMEDIATE V_SQL;
+	COMMIT;
+
+END;

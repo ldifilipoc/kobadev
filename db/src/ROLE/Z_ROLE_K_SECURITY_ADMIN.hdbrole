@@ -1,0 +1,36 @@
+{
+  "role": {
+    "name": "Z_ROLE_K_SECURITY_ADMIN#",
+    "schema_privileges": [
+      {
+        "reference": "KOBA_HDI_DB_1",
+        "privileges": [
+          "SELECT METADATA",
+          "UPDATE",
+          "SQLSCRIPT LOGGING",
+          "SELECT",
+          "INSERT",
+          "EXECUTE",
+          "DELETE",
+          "CREATE TEMPORARY TABLE",
+          "CREATE OBJECT STRUCTURED PRIVILEGE",
+          "CREATE ANY",
+          "ALTER"
+        ],
+        "privileges_with_grant_option": [
+          "ALTER",
+          "CREATE ANY",
+          "CREATE OBJECT STRUCTURED PRIVILEGE",
+          "CREATE TEMPORARY TABLE",
+          "DELETE",
+          "EXECUTE",
+          "SELECT",
+          "SELECT METADATA",
+          "SQLSCRIPT LOGGING",
+          "UNMASKED",
+          "UPDATE"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Calculation:scenario xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:Calculation="http://www.sap.com/ndb/BiModelCalculation.ecore" id="CV_KOBA_SD_CEBE" applyPrivilegeType="NONE" dataCategory="CUBE" schemaVersion="3.0" outputViewType="Aggregation" cacheInvalidationPeriod="NONE" enforceSqlExecution="false">
+<descriptions defaultDescription="CV_KOBA_SD_CEBE"/>
+<localVariables/>
+<variableMappings/>
+<dataSources>
+  <DataSource id="FT_VBAK">
+    <resourceUri>FT_VBAK</resourceUri>
+  </DataSource>
+  <DataSource id="FT_VBAP">
+    <resourceUri>FT_VBAP</resourceUri>
+  </DataSource>
+</dataSources>
+<calculationViews>
+  <calculationView xsi:type="Calculation:ProjectionView" id="Projection_1">
+    <viewAttributes>
+      <viewAttribute id="VBELN"/>
+      <viewAttribute id="ERDAT"/>
+      <viewAttribute id="AUDAT"/>
+      <viewAttribute id="VBTYP"/>
+      <viewAttribute id="AUART"/>
+      <viewAttribute id="AUGRU"/>
+      <viewAttribute id="LIFSK"/>
+      <viewAttribute id="FAKSK"/>
+      <viewAttribute id="NETWR"/>
+      <viewAttribute id="WAERK"/>
+      <viewAttribute id="VKORG"/>
+      <viewAttribute id="VKBUR"/>
+      <viewAttribute id="VBKLT"/>
+      <viewAttribute id="KNUMV"/>
+      <viewAttribute id="KUNNR"/>
+    </viewAttributes>
+    <calculatedViewAttributes/>
+    <input node="FT_VBAK"/>
+  </calculationView>
+  <calculationView xsi:type="Calculation:ProjectionView" id="Projection_2">
+    <viewAttributes>
+      <viewAttribute id="VBELN"/>
+      <viewAttribute id="POSNR"/>
+      <viewAttribute id="MATNR"/>
+      <viewAttribute id="VGBEL"/>
+      <viewAttribute id="NETPR"/>
+      <viewAttribute id="KZWI1"/>
+      <viewAttribute id="KZWI2"/>
+      <viewAttribute id="KZWI3"/>
+      <viewAttribute id="KZWI4"/>
+      <viewAttribute id="KZWI5"/>
+      <viewAttribute id="KZWI6"/>
+      <viewAttribute id="PRCTR"/>
+      <viewAttribute id="NETWR"/>
+    </viewAttributes>
+    <calculatedViewAttributes/>
+    <input node="FT_VBAP"/>
+  </calculationView>
+  <calculationView xsi:type="Calculation:JoinView" id="Join_1" cardinality="CN_N" joinType="inner">
+    <viewAttributes>
+      <viewAttribute id="VBELN"/>
+      <viewAttribute id="ERDAT"/>
+      <viewAttribute id="AUDAT"/>
+      <viewAttribute id="VBTYP"/>
+      <viewAttribute id="AUART"/>
+      <viewAttribute id="AUGRU"/>
+      <viewAttribute id="LIFSK"/>
+      <viewAttribute id="FAKSK"/>
+      <viewAttribute id="NETWR_VBAK" aggregationType="sum"/>
+      <viewAttribute id="WAERK"/>
+      <viewAttribute id="VKORG"/>
+      <viewAttribute id="VKBUR"/>
+      <viewAttribute id="VBKLT"/>
+      <viewAttribute id="KNUMV"/>
+      <viewAttribute id="KUNNR"/>
+      <viewAttribute id="POSNR"/>
+      <viewAttribute id="MATNR"/>
+      <viewAttribute id="VGBEL"/>
+      <viewAttribute id="NETPR" aggregationType="sum"/>
+      <viewAttribute id="KZWI1" aggregationType="sum"/>
+      <viewAttribute id="KZWI2" aggregationType="sum"/>
+      <viewAttribute id="KZWI3" aggregationType="sum"/>
+      <viewAttribute id="KZWI4" aggregationType="sum"/>
+      <viewAttribute id="KZWI5" aggregationType="sum"/>
+      <viewAttribute id="KZWI6" aggregationType="sum"/>
+      <viewAttribute id="PRCTR"/>
+      <viewAttribute id="NETWR_VBAP" aggregationType="sum"/>
+    </viewAttributes>
+    <calculatedViewAttributes/>
+    <input node="Projection_1">
+      <mapping xsi:type="Calculation:AttributeMapping" target="VBELN" source="VBELN"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="ERDAT" source="ERDAT"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="AUDAT" source="AUDAT"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="VBTYP" source="VBTYP"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="AUART" source="AUART"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="AUGRU" source="AUGRU"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="LIFSK" source="LIFSK"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="FAKSK" source="FAKSK"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="NETWR_VBAK" source="NETWR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="WAERK" source="WAERK"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="VKORG" source="VKORG"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="VKBUR" source="VKBUR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="VBKLT" source="VBKLT"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="KNUMV" source="KNUMV"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="KUNNR" source="KUNNR"/>
+    </input>
+    <input node="Projection_2">
+      <mapping xsi:type="Calculation:AttributeMapping" target="POSNR" source="POSNR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="MATNR" source="MATNR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="VGBEL" source="VGBEL"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="NETPR" source="NETPR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="KZWI1" source="KZWI1"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="KZWI2" source="KZWI2"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="KZWI3" source="KZWI3"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="KZWI4" source="KZWI4"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="KZWI5" source="KZWI5"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="KZWI6" source="KZWI6"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="PRCTR" source="PRCTR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="NETWR_VBAP" source="NETWR"/>
+      <mapping xsi:type="Calculation:AttributeMapping" target="VBELN" source="VBELN"/>
+    </input>
+    <joinAttribute name="VBELN"/>
+  </calculationView>
+</calculationViews>
+<logicalModel id="Join_1">
+  <attributes>
+    <attribute id="DOCUMENTO_VENTAS" order="1" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="VBELN"/>
+      <keyMapping columnObjectName="Join_1" columnName="VBELN"/>
+    </attribute>
+    <attribute id="FECHA_CREACION" order="2" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="ERDAT"/>
+      <keyMapping columnObjectName="Join_1" columnName="ERDAT"/>
+    </attribute>
+    <attribute id="FECHA_DOCUMENTO" order="3" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="AUDAT"/>
+      <keyMapping columnObjectName="Join_1" columnName="AUDAT"/>
+    </attribute>
+    <attribute id="TIPO_DOC_COMERCIAL" order="4" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="VBTYP"/>
+      <keyMapping columnObjectName="Join_1" columnName="VBTYP"/>
+    </attribute>
+    <attribute id="CLASE_DOC_VENTAS" order="5" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="AUART"/>
+      <keyMapping columnObjectName="Join_1" columnName="AUART"/>
+    </attribute>
+    <attribute id="MOTIVO_PEDIDO" order="6" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="AUGRU"/>
+      <keyMapping columnObjectName="Join_1" columnName="AUGRU"/>
+    </attribute>
+    <attribute id="BLOQUEO_NOTA" order="7" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="LIFSK"/>
+      <keyMapping columnObjectName="Join_1" columnName="LIFSK"/>
+    </attribute>
+    <attribute id="BLOQUEO_CLASES" order="8" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="FAKSK"/>
+      <keyMapping columnObjectName="Join_1" columnName="FAKSK"/>
+    </attribute>
+    <attribute id="MONEDA" order="10" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="WAERK"/>
+      <keyMapping columnObjectName="Join_1" columnName="WAERK"/>
+    </attribute>
+    <attribute id="ORGANIZACION_VENTAS" order="11" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="VKORG"/>
+      <keyMapping columnObjectName="Join_1" columnName="VKORG"/>
+    </attribute>
+    <attribute id="OFICINA_VENTAS" order="12" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="VKBUR"/>
+      <keyMapping columnObjectName="Join_1" columnName="VKBUR"/>
+    </attribute>
+    <attribute id="IDENTIFICACION_DOC_COMERCIAL" order="13" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="VBKLT"/>
+      <keyMapping columnObjectName="Join_1" columnName="VBKLT"/>
+    </attribute>
+    <attribute id="NUMERO_CONDICION_DOC" order="14" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="KNUMV"/>
+      <keyMapping columnObjectName="Join_1" columnName="KNUMV"/>
+    </attribute>
+    <attribute id="SOLICITANTE" order="15" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="KUNNR"/>
+      <keyMapping columnObjectName="Join_1" columnName="KUNNR"/>
+    </attribute>
+    <attribute id="POSICION_DOC" order="16" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="POSNR"/>
+      <keyMapping columnObjectName="Join_1" columnName="POSNR"/>
+    </attribute>
+    <attribute id="MATERIAL" order="17" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="MATNR"/>
+      <keyMapping columnObjectName="Join_1" columnName="MATNR"/>
+    </attribute>
+    <attribute id="NUM_DOC_MODELO" order="18" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="VGBEL"/>
+      <keyMapping columnObjectName="Join_1" columnName="VGBEL"/>
+    </attribute>
+    <attribute id="PRCTR" order="26" displayAttribute="false" attributeHierarchyActive="false">
+      <descriptions defaultDescription="PRCTR"/>
+      <keyMapping columnObjectName="Join_1" columnName="PRCTR"/>
+    </attribute>
+  </attributes>
+  <calculatedAttributes/>
+  <baseMeasures>
+    <measure id="VALOR_NETO" order="9" aggregationType="sum" measureType="simple">
+      <descriptions defaultDescription="NETWR"/>
+      <measureMapping columnObjectName="Join_1" columnName="NETWR_VBAK"/>
+    </measure>
+    <measure id="PRECIO_NETO_CABECERA" order="19" aggregationType="sum" measureType="simple" hidden="true">
+      <descriptions defaultDescription="NETPR"/>
+      <measureMapping columnObjectName="Join_1" columnName="NETPR"/>
+    </measure>
+    <measure id="KZWI1" order="20" aggregationType="sum" measureType="simple" hidden="true">
+      <descriptions defaultDescription="KZWI1"/>
+      <measureMapping columnObjectName="Join_1" columnName="KZWI1"/>
+    </measure>
+    <measure id="KZWI2" order="21" aggregationType="sum" measureType="simple" hidden="true">
+      <descriptions defaultDescription="KZWI2"/>
+      <measureMapping columnObjectName="Join_1" columnName="KZWI2"/>
+    </measure>
+    <measure id="KZWI3" order="22" aggregationType="sum" measureType="simple" hidden="true">
+      <descriptions defaultDescription="KZWI3"/>
+      <measureMapping columnObjectName="Join_1" columnName="KZWI3"/>
+    </measure>
+    <measure id="KZWI4" order="23" aggregationType="sum" measureType="simple" hidden="true">
+      <descriptions defaultDescription="KZWI4"/>
+      <measureMapping columnObjectName="Join_1" columnName="KZWI4"/>
+    </measure>
+    <measure id="KZWI5" order="24" aggregationType="sum" measureType="simple" hidden="true">
+      <descriptions defaultDescription="KZWI5"/>
+      <measureMapping columnObjectName="Join_1" columnName="KZWI5"/>
+    </measure>
+    <measure id="KZWI6" order="25" aggregationType="sum" measureType="simple" hidden="true">
+      <descriptions defaultDescription="KZWI6"/>
+      <measureMapping columnObjectName="Join_1" columnName="KZWI6"/>
+    </measure>
+    <measure id="PRECIO_NETO_POS" order="27" aggregationType="sum" measureType="simple">
+      <descriptions defaultDescription="NETWR"/>
+      <measureMapping columnObjectName="Join_1" columnName="NETWR_VBAP"/>
+    </measure>
+  </baseMeasures>
+  <calculatedMeasures/>
+  <restrictedMeasures/>
+  <localDimensions/>
+</logicalModel>
+<layout>
+  <shapes>
+    <shape expanded="true" modelObjectName="Output" modelObjectNameSpace="MeasureGroup">
+      <upperLeftCorner x="100" y="105"/>
+    
+      <rectangleSize width="160"/>
+    </shape>
+  
+    <shape expanded="true" modelObjectName="Projection_1" modelObjectNameSpace="CalculationView">
+      <upperLeftCorner x="-444" y="485"/>
+      <rectangleSize height="30" width="160"/>
+    </shape>
+    <shape expanded="true" modelObjectName="Projection_2" modelObjectNameSpace="CalculationView">
+      <upperLeftCorner x="-63" y="475"/>
+      <rectangleSize height="30" width="160"/>
+    </shape>
+    <shape expanded="true" modelObjectName="Join_1" modelObjectNameSpace="CalculationView">
+      <upperLeftCorner x="-235" y="284"/>
+      <rectangleSize height="30" width="160"/>
+    </shape>
+    <shape modelObjectName="Projection_1" modelObjectNameSpace="Join_1" modelObjectType="JoinNodeInput">
+      <upperLeftCorner x="20" y="30"/>
+      <rectangleSize width="136"/>
+    </shape>
+    <shape modelObjectName="Projection_2" modelObjectNameSpace="Join_1" modelObjectType="JoinNodeInput">
+      <upperLeftCorner x="320" y="30"/>
+      <rectangleSize width="136"/>
+    </shape>
+  </shapes>
+</layout>
+</Calculation:scenario>

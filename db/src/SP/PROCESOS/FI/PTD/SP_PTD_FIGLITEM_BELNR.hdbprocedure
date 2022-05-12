@@ -1,0 +1,35 @@
+PROCEDURE "SP_PTD_FIGLITEM_BELNR"(GJAHR VARCHAR(4), pDesde VARCHAR(10), pHasta VARCHAR(10))
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+   PTD: Proceso de transferencia de datos
+	Carga de partidas individuales en modo full (rango de fecha/hora de carga pFDesde-pFHasta)
+	Fecha de Creación:02/12/2019
+	Creado por: CORG-JPIMIENTA
+	Modifica:CORG-JPIMIENTA
+	Motivo cambio: 11/02/2020	Cambio de nombre
+	
+	Stage table:  STG_FAGLFLEXA
+	Hecho destino: FT_FIGLITEM
+	
+   *************************************/
+	Declare pEmpresa smallint = 28;
+	Declare pTipoCarga Varchar(1)='F';
+	Declare pBUKRS VARCHAR(4) = '6A00';
+	
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+       
+    select CD_DW_EMPRESA into pEmpresa from DIM_EMPRESA WHERE CD_EMPRESA=:pBUKRS;   
+	--PASO 1: Se limpia la tabla temporal de carga    	
+   	truncate table STG_ABAP_FAGLFLEXA;
+   	
+	--PASO 2. Carga de Partidas individuales de Finanzas, requeridas para extraer el centro de beneficio que le corresponde a cada movimiento del POS
+	CALL SP_STG_FAGLFLEXA_LOAD_BELNR(:GJAHR,:pDesde, :pHasta);
+	
+	--PASO 3. Carga Final de Partidas individuales de finanzas a la FACT TABLE
+	CALL SP_FT_FIGLITEM_LOAD_V001(:pTipoCarga);
+	
+END

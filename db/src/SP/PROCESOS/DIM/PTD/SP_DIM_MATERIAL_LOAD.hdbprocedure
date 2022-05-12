@@ -1,0 +1,52 @@
+PROCEDURE "SP_DIM_MATERIAL_LOAD"( )
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+       Maestro de Materiales de KOBA
+       Carga el ID y texto del Material de KOBA al stage con base a la tarea de replicación: RT_0MATERIAL_TEXT
+       La tarea de replicación filtra solo los materiales con la siguiente condición
+    		SPRAS='S' 
+    		AND (   (MATNR>= '000000000011000000' AND MATNR< '000000000013000000') 
+    		     OR (MATNR>= '000000000060000000' AND MATNR< '000000000069999999'))
+       
+       Extractor Fuente VT_0MATERIAL, destino STG_0MATERIAL, Dimensión: DIM_MATERIAL
+   *************************************/
+   declare Consecutivo int;
+
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+ 
+	call "RT_0MATERIAL_TEXT.START_REPLICATION";
+
+	--Nuevos Materiales o Cambios de nombre de material
+	--No se utiliza MERGE para insertar y actualizar para no hacer actualización full del material todo el tiempo y no llegar el log de HANA
+	
+	mat=SELECT	M."MATNR" CD_MAT,
+				(CASE length(ltrim(M."MATNR",'+-.0123456789')) WHEN 0 THEN M."MATNR" END) CD_MAT_INT, --Algunos materiales llegan con el código errado
+				M.TXTMD TX_MAT
+		FROM "STG_0MATERIAL" M;
+
+	--Se actualizan los materiales existentes
+	MERGE INTO DIM_MATERIAL
+	USING :mat S 
+		ON S.CD_MAT = CD_MATERIAL
+		AND NOT TX_MATERIAL = TX_MAT --Donde el nombre del material cambie, se actualiza
+	WHEN MATCHED THEN UPDATE SET TX_MATERIAL = TX_MAT;
+	COMMIT;
+	
+	--Se insertan los nuevos materiales
+	INSERT INTO DIM_MATERIAL (CD_MATERIAL,CD_MATERIAL_INT,TX_MATERIAL)			
+	SELECT	CD_MAT,CD_MAT_INT,TX_MAT
+	FROM :mat S
+	LEFT JOIN DIM_MATERIAL D
+		ON  S.CD_MAT = D.CD_MATERIAL
+	WHERE D.CD_DW_MATERIAL IS NULL
+	AND NOT S.CD_MAT_INT=0;
+	COMMIT;
+	
+	--Se limpia la tabla de stage
+	truncate table STG_0MATERIAL;
+	
+END

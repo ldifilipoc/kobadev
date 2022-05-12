@@ -1,0 +1,20 @@
+VIEW VW_SALDOS_CONSOLIDACION AS
+SELECT  FT.CD_PERIODO, 
+		CTA.CD_CONSOLIDACION CD_CUENTA,
+		ifnull(ETL.CD_DIMENSION,'NO_INTCO') CD_ENTIDAD_INTCO,
+		SUM(FT.VL_HSL*100) VL_SALDO				 
+FROM FT_FIGLITEM FT 
+INNER JOIN DIM_CUENTA CTA ON CTA.CD_DW_CUENTA =FT.CD_DW_CUENTA 	
+INNER JOIN DIM_DOCFI DOC ON DOC.CD_DW_BKPF = FT.CD_DW_BELNR 
+	AND DOC.BSTAT = ''
+	AND NOT DOC.CD_BLART='CF'			
+	AND NOT CTA.CD_CUENTA IN ('5905050000') --Se excluye cuenta de pérdida en caso de que alguna compañía contabilice este valor en el periodo, de lo contrario la utilidad daría cero.
+LEFT JOIN ETL_TRADUCCION ETL --Tabla de Intercompañías con NIT
+	ON ETL.DS_DIMENSION = FT.XREF1 
+	AND ETL.CD_TABLA = 20	
+GROUP BY FT.CD_PERIODO, CTA.CD_CONSOLIDACION,ETL.CD_DIMENSION;
+
+/*
+Saldos por intercompañía, alimentado desde plantilla de Excel de Administración de Datos Maestros.
+Esta vista se consulta virtualmente desde el tenant de valorem.
+*/

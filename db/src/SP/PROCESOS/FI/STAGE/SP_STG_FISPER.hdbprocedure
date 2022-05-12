@@ -1,0 +1,62 @@
+PROCEDURE "SP_STG_FISPER"( )
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+	DECLARE V_SQL NVARCHAR(500);
+
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+       
+	Cierre =select distinct BUKRS,FRYE1,TOYE1,
+					replace(replace(replace(replace(FRPE1,'016','012'),'015','012'),'014','012'),'013','012') FRPE1,
+					replace(replace(replace(replace(TOPE1,'016',012),'015',012),'014','012'),'013','012') TOPE1
+			from VT_ABAP_T001B where BUKRS LIKE '6A0L' AND FRYE1<>'0000'; 
+			
+	Conversion =select	BUKRS,Max(FRYE1||FRPE1) PER1,Max(TOYE1||TOPE1) PER2,
+						Max(FRYE1||substr(FRPE1,2,2)||'01') DESDE1,
+						Max(TOYE1||substr(TOPE1,2,2)||'01') DESDE2
+				from :Cierre group by BUKRS;
+
+	TSTG_FISPER=	select distinct BUKRS, PER1 PERIODO1, 
+							PER2 PERIODO2,CAST( DESDE1 as date) DESDE1,LAST_DAY(CAST( DESDE1 as date)) HASTA1, 
+							CAST(DESDE2 as date) DESDE2,LAST_DAY(CAST(DESDE2 as date)) HASTA2
+					from :Conversion
+					where BUKRS LIKE '6A0L';
+
+	FISPER  = SELECT	T.BUKRS,
+						(CASE WHEN T."PERIODO1" = T.PERIODO2 THEN Year(add_months(T."DESDE2",-1))||'0'||TO_VARCHAR(Month(add_months(T."DESDE2",-1)),'00') ELSE T."PERIODO1" END) PERIODO1,	
+						T.PERIODO2,	
+						(CASE WHEN T."DESDE1" = T."DESDE2" THEN add_months(T."DESDE1",-1) ELSE T."DESDE1" END)				DESDE1,
+						(CASE WHEN T."HASTA1" = T."HASTA2" THEN LAST_DAY(add_months(T."DESDE1",-1)) ELSE T."HASTA1" END)	HASTA1,	
+						T.DESDE2, 
+						T.HASTA2
+				FROM :TSTG_FISPER T;
+	
+	MERGE INTO DIM_FISPER S USING :FISPER T ON T.BUKRS=S.BUKRS
+	WHEN MATCHED THEN UPDATE SET	S."PERIODO1"=T."PERIODO1",	
+									S."PERIODO2"=T."PERIODO2",	
+									S."DESDE1"	=T."DESDE1",
+									S."HASTA1"	=T."HASTA1",	
+									S."DESDE2"	=T."DESDE2", 
+									S."HASTA2"	=T."HASTA2",
+									S."CD_PERIODO1" = TO_VARCHAR(T.DESDE1,'YYYYMM'),
+									S."CD_PERIODO2" = TO_VARCHAR(T.DESDE2,'YYYYMM')
+	WHEN NOT MATCHED THEN INSERT (BUKRS,PERIODO1,PERIODO2,DESDE1,HASTA1,DESDE2,HASTA2,CD_PERIODO1,CD_PERIODO2)
+	VALUES (T.BUKRS,T.PERIODO1,T.PERIODO2,T.DESDE1,T.HASTA1,T.DESDE2,T.HASTA2,TO_VARCHAR(T.DESDE1,'YYYYMM'),TO_VARCHAR(T.DESDE2,'YYYYMM'));
+
+	COMMIT;
+	
+	TRUNCATE TABLE ETL_PARTICIONES; --Se trunca la tabla debido a que si se restructura una partición los ID para cada periodo cambian.
+									--por ejemplo si agregan una partición de un periodo viejo, este toma el 1 y de ahí en adelante todos cambian.
+	
+	--Nuevos Periodos para el control de actualización de datos en particiones
+	--Solo llegan nuevos datos si el administrador de la BD crea nuevas particiones en las tablas o si se crean nuevas tablas particionadas
+	
+	V_SQL =	'INSERT INTO KOBA_HDI_DB_1.ETL_PARTICIONES (TABLA, PERIODO, PART_ID)'||
+			'SELECT TP.TABLE_NAME, TP.LEVEL_1_RANGE_MIN_VALUE, TP.PART_ID '||
+			'FROM TABLE_PARTITIONS TP INNER JOIN ETL_TRADUCCION ETL '||
+			'ON ETL.CD_DIMENSION = TP.TABLE_NAME AND ETL.CD_TABLA = 0 AND TP.SCHEMA_NAME= ''KOBA_HDI_DB_1'' ';	
+	EXECUTE IMMEDIATE V_SQL;
+	
+END

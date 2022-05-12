@@ -1,0 +1,168 @@
+PROCEDURE "SP_FT_FIGLITEM_LOAD_V001"(pTipoCarga VARCHAR(1))
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+	Carga de partidas individuales de Finanzas
+	Fecha de Creación:02/12/2019
+	Creado por: CORG-JPIMIENTA
+
+	Motivo cambio:	05/04/2020 CORG. Se agrega instrucción para actualizar el centro de beneficio en el encabezado de documento FI para facilitar el cargue de la COEP para KOBA
+					05/11/2020 CORG. Se retira MERGE en FT_FIGLITEM por mayor consumo de memoria. Se reemplaza por ITEMS=-1, control en encabezado BKPF para identificar si ya está o no el detalle.
+	Stage table: STG_FAGLFLEXA
+	Hecho destino: FT_FIGLITEM
+   *************************************/
+    DECLARE n int;
+    DECLARE pEmpresa SMALLINT=28;
+    DECLARE pBUKRS VARCHAR(10)='6A00';
+    DECLARE pFechaaCargar DATETIME;
+    DECLARE pBLART VARCHAR(1);
+    DECLARE pTabla VARCHAR(30);
+    DECLARE m int;
+    
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+
+	FIGL=	select	:pEmpresa CD_DW_EMPRESA, 
+					B.CD_DW_BKPF CD_DW_BELNR, 
+					cast(F.DOCLN as smallint) CD_DW_BUZEI,
+					substr(F.BUDAT,0,6) CD_PERIODO,
+					C.CD_DW_CUENTA,
+					ifnull(CECO.CD_DW_CECO,0) CD_DW_CECO,
+					ifnull(CEBE.CD_DW_CEBE,0) CD_DW_CEBE,
+					cast(F.BUDAT as date) FE_BUDAT,
+					DRCRK CD_DRCRK,
+					F.RTCUR CD_RTCUR,
+					RWCUR CD_RWCUR,
+					F."HSL" VL_HSL,--  F."HSL" valor en moneda local
+					F."OSL" VL_OSL, -- F."OSL" valor en otra moneda 
+					F."TIMESTAMP", 
+					F.BELNR,
+					B.CD_EJERCICIO,
+					F.PRCTR
+			from STG_ABAP_FAGLFLEXA F 
+			inner join DIM_DOCFI B 
+					on B.CD_BELNR = F.BELNR 
+					AND B.CD_EJERCICIO=F.GJAHR 
+					AND B.CD_DW_EMPRESA=:pEmpresa
+			left join DIM_CUENTA C 
+					ON C.CD_CUENTA = F.RACCT
+			left join DIM_CECO CECO 
+					ON CECO.CD_CECO = F.RCNTR
+			left join DIM_CEBE_PRCTR CEBE 
+					ON CEBE.CD_CEBE = F.PRCTR
+			where F.RBUKRS=:pBUKRS 
+			AND (ITEMS<1 OR (:pTipoCarga = '0' AND POS_ITEMS<1)); 
+			--ITEMS=-1 filtra solo los documentos que no han sido previamente cargados.
+			--:pTipoCarga = 0 Representa las posiciones 0 de la FAGLFLEXA, se tratan como carga adicional para que coincida el debito y crédito
+			--POS_ITEMS = -1 representan los documentos con posición ó BUZEI = '000' que no se han cargado de la FLEXA
+	select ifnull(count(*),0) into n from :FIGL;
+	
+	IF :n>0 THEN
+		insert into "FT_FIGLITEM"("CD_DW_EMPRESA","CD_DW_BELNR","CD_DW_BUZEI","CD_PERIODO","CD_DW_CUENTA","CD_DW_CECO","CD_DW_CEBE","FE_BUDAT","CD_DRCRK","VL_HSL","VL_OSL") 
+		select S."CD_DW_EMPRESA",S."CD_DW_BELNR",S."CD_DW_BUZEI",S."CD_PERIODO",S."CD_DW_CUENTA",S."CD_DW_CECO",S."CD_DW_CEBE",S."FE_BUDAT",S."CD_DRCRK",S."VL_HSL",S."VL_OSL"
+		from :FIGL S;
+		COMMIT;
+		
+		--Datos de control
+		--Se actualiza para cada documento cargado, el # de posiciones y el timestamp del detalle documento (generalmente diferente al del encabezado)
+		IF :pTipoCarga = '0' THEN
+			MERGE INTO DIM_DOCFI D 
+			USING (	SELECT CD_DW_BELNR, CD_EJERCICIO, MAX(CD_DW_BUZEI) ITEMS, Max("TIMESTAMP") TIMESTMP 
+					FROM :FIGL 
+					GROUP BY CD_DW_BELNR, CD_EJERCICIO) F 
+				ON F.CD_DW_BELNR  = D.CD_DW_BKPF 
+				AND F.CD_EJERCICIO = D.CD_EJERCICIO  --Por mejor práctica, se debe hacer join indicando la partición (AÑO)
+			WHEN MATCHED THEN UPDATE SET
+				D.POS_ITEMS = F.ITEMS;			--Cantidad de posiciones del documento FI (BKPF)
+		ELSE
+			MERGE INTO DIM_DOCFI D 
+			USING (	SELECT CD_DW_BELNR, CD_EJERCICIO, MAX(CD_DW_BUZEI) ITEMS, Max("TIMESTAMP") TIMESTMP 
+					FROM :FIGL 
+					GROUP BY CD_DW_BELNR, CD_EJERCICIO) F 
+				ON F.CD_DW_BELNR  = D.CD_DW_BKPF 
+				AND F.CD_EJERCICIO = D.CD_EJERCICIO  --Por mejor práctica, se debe hacer join indicando la partición (AÑO)
+			WHEN MATCHED THEN UPDATE SET
+				D.ITEMS = F.ITEMS,			--Cantidad de posiciones del documento FI (BKPF)
+				D.TIMESTMP = F.TIMESTMP;	--Último Timestamp de las posiciones
+		END IF;
+		
+		COMMIT;
+
+		----------    ACTUALIZACION DE LA TABLA ETL CONTROL		----------						
+		--Cantidad de registros cargados para la clase de documento	
+		select Count(CD_DW_BELNR) 
+		into M
+		from :FIGL;
+
+		--Cantidad de registros cargados a la FACT TABLE
+		insert into ETL_CONTROL_CARGUE(TABLA,FECHA_CARGA,TIPO_CARGA,BUKRS,GJAHR,BELNR_DESDE,BELNR_HASTA,TIMESTMP_DESDE,TIMESTMP_HASTA,ULTIMA_FECHA,REGISTROS_PROCESADOS)
+		select 'FT_FIGLITEM',now(),:pTipoCarga,:pBUKRS,min(CD_EJERCICIO),Min(S."BELNR"),Max(S."BELNR"),Min(S."TIMESTAMP"),Max(S."TIMESTAMP"),Max(FE_BUDAT),Count(CD_DW_BUZEI)
+		from :FIGL S;
+		COMMIT;
+
+		--Para KOBA, los encabezado de documento se actualizan con los centros de beneficio para la cuenta de ingresos, 
+		--con el fin de que al cargar las partidas de la COEP, estas queden almacenadas con su centro de beneficio correspondiente al documento FI
+		IF :pTipoCarga != '0' THEN
+			docfi=	SELECT "CD_DW_BELNR",Max("CD_DW_CEBE") CD_DW_CEBE, Max(F.PRCTR) PRCTR
+					FROM :FIGL F
+					WHERE (CD_DW_CUENTA=1441 OR CD_DW_CUENTA=1522) AND "CD_DW_CEBE"<>0
+					GROUP BY "CD_DW_BELNR";
+		
+			merge into DIM_DOCFI D
+			using :docfi F on (F.CD_DW_BELNR = D.CD_DW_BKPF)
+			when matched then update set D.CD_DW_CEBE = F.CD_DW_CEBE, D.CD_CEBE = F.PRCTR;
+			COMMIT;
+		END IF;
+		
+	
+	ELSE 
+
+		--Si es una carga FULL para corregir el Centro de Beneficio
+		--Es raro que ocurra, pero se detectó que cuando se carga el dato por la BSEG los CEBE vienen en blanco para las cuentas de activos.
+		IF :pTipoCarga = 'F' THEN 
+
+			FIGL=	select	:pEmpresa CD_DW_EMPRESA, 
+							B.CD_DW_BKPF CD_DW_BELNR, 
+							cast(F.DOCLN as smallint) CD_DW_BUZEI,
+							substr(F.BUDAT,0,6) CD_PERIODO,
+							C.CD_DW_CUENTA,
+							ifnull(CECO.CD_DW_CECO,0) CD_DW_CECO,
+							ifnull(CEBE.CD_DW_CEBE,0) CD_DW_CEBE,
+							cast(F.BUDAT as date) FE_BUDAT,
+							DRCRK CD_DRCRK,
+							F.RTCUR CD_RTCUR,
+							RWCUR CD_RWCUR,
+							F."HSL" VL_HSL,--  F."HSL" valor en moneda local
+							F."OSL" VL_OSL, -- F."OSL" valor en otra moneda 
+							F."TIMESTAMP", 
+							F.BELNR,
+							B.CD_EJERCICIO,
+							F.PRCTR
+					from STG_ABAP_FAGLFLEXA F 
+					inner join DIM_DOCFI B 
+							on B.CD_BELNR = F.BELNR 
+							AND B.CD_EJERCICIO=F.GJAHR 
+							AND B.CD_DW_EMPRESA=:pEmpresa
+					left join DIM_CUENTA C 
+							ON C.CD_CUENTA = F.RACCT
+					left join DIM_CECO CECO 
+							ON CECO.CD_CECO = F.RCNTR
+					left join DIM_CEBE_PRCTR CEBE 
+							ON CEBE.CD_CEBE = F.PRCTR
+					where F.RBUKRS=:pBUKRS;
+			
+			MERGE INTO FT_FIGLITEM FT 
+			USING :FIGL STG 
+				ON STG.CD_DW_BELNR = FT.CD_DW_BELNR 
+				AND STG.CD_DW_BUZEI = FT.CD_DW_BUZEI
+				AND STG.CD_PERIODO = FT.CD_PERIODO
+				AND FT.CD_DW_CEBE = 0
+			WHEN MATCHED AND STG.CD_DW_CEBE!=0 THEN 
+			UPDATE SET CD_DW_CEBE = STG.CD_DW_CEBE; 
+			COMMIT;
+			
+		END IF;		
+	END IF;
+END

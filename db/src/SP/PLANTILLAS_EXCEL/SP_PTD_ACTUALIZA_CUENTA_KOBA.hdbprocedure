@@ -1,0 +1,23 @@
+PROCEDURE "SP_PTD_ACTUALIZA_CUENTA_KOBA"(Cuenta VARCHAR(20), Concepto_ID VARCHAR(10), Concepto VARCHAR(100), Nodo1_ID VARCHAR(100), Nodo1 VARCHAR(100), Nodo2_ID VARCHAR(100), Nodo2 VARCHAR(100), Nodo3_ID VARCHAR(100), Nodo3 VARCHAR(100), Nodo4_ID VARCHAR(100), Nodo4 VARCHAR(100))
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+	/*  Este proceso actualiza el concepto de una cuenta temporalmente vía plantilla de Excel
+		A solicitud del área de planeación, ante el evento en que datos maestros no realice el cambio en SAP
+		en la jerarquía de PyG Koba.
+	*/
+	UPDATE DIM_CUENTA 
+	SET CD_JERARQUIA_KOBA1 =:Nodo1_ID,
+		NM_JERARQUIA_KOBA1 =:Nodo1,
+		CD_JERARQUIA_KOBA2 =:Nodo2_ID,
+		NM_JERARQUIA_KOBA2 =:Nodo2,
+		CD_JERARQUIA_KOBA3 =:Nodo3_ID,
+		NM_JERARQUIA_KOBA3 =:Nodo3,		
+		CD_JERARQUIA_KOBA4 =:Nodo4_ID,
+		NM_JERARQUIA_KOBA4 =:Nodo4,
+		CD_CONCEPTO =:Concepto_ID,
+		NM_CONCEPTO =:Concepto	
+	WHERE CD_CUENTA = :Cuenta;
+	
+END

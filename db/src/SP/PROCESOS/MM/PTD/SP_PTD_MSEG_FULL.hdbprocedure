@@ -1,0 +1,53 @@
+PROCEDURE "SP_PTD_MSEG_FULL"(pTipoCarga VARCHAR(1),pEjercicio int, pDesde bigint, pLimite bigint,pRango int, Pperiodo int)
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+        Para obtener el ultimo consecutivo ingresado
+       	select TO_INT(right(Max(BELNR_HASTA),8)) into pDesde from ETL_CONTROL_CARGUE 
+		where TABLA='FT_MSEG' and BLART=:pBLART;
+   *************************************/
+    Declare pEmpresa smallint;
+    Declare pHasta bigint;
+    Declare pMBLNR_DESDE NVARCHAR(10);
+    Declare pMBLNR_HASTA NVARCHAR(10);
+    Declare pPeriodo INT;
+    Declare pParticion INT;
+    
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+
+	pHasta = :pDesde+(:pRango-1);
+	IF :pHasta > :pLimite THEN
+		pHasta = :pLimite;
+	END IF;
+	IF :pTipoCarga = 'F' THEN
+	
+	    while :pDesde <= :pLimite do
+	    --while :pDesde <= :pHasta do
+	    
+	    	pMBLNR_DESDE = TO_VARCHAR(:pDesde,'0000000000');
+	    	pMBLNR_HASTA = TO_VARCHAR(:pHasta,'0000000000');
+	    	truncate table STG_ABAP_MSEG;
+	    	
+			CALL SP_STG_MSEG_LOAD_V001(:pEjercicio,:pMBLNR_DESDE,:pMBLNR_HASTA,:pTipoCarga);
+			
+			SELECT ETl.PERIODO,ETL.PART_ID INTO pPeriodo, pParticion
+			FROM STG_ABAP_MSEG 
+			INNER JOIN ETL_PARTICIONES ETL 
+					ON ETL.PERIODO = SUBSTRING(BUDAT_MKPF,1,6)
+					AND ETL.TABLA = 'FT_MSEG'
+			GROUP BY ETl.PERIODO,ETL.PART_ID;
+
+			CALL SP_FT_MSEG_LOAD_V001(:pTipoCarga, :pPeriodo, :pParticion);
+			
+			merge delta of FT_MSEG;
+			pDesde =:pDesde+:pRango;
+			pHasta =:pHasta+(:pRango-1);
+		
+		end while;
+		
+	END IF;
+	
+END

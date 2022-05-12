@@ -1,0 +1,52 @@
+ PROCEDURE "SP_STG_COEP_LOAD_V001"(pTipoCarga VARCHAR(1), pTIMESTMP_DESDE VARCHAR(15), pTIMESTMP_HASTA VARCHAR(15))
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+	Carga del ingreso contabilizado del el POS, impuesto, impoconsumo, costo contabilizado, costo unitario
+	Fecha de Creación:02/12/2019
+	Creado por: CORG-JPIMIENTA
+	Modifica:CORG-JPIMIENTA
+	Motivo cambio: 11/02/2020 Manejo de Deltas
+				   05/04/2020 Asegurar que no se inserten timestamp de partidas individuales cuyo encabezado de documento aun no ha sido creado
+	Tabla Virtual usada:	VT_ABAP_COEP (Detalle documento CO, del cual solo se extrae la cuenta 41 y la 61 (Para conciliación del costo total))
+							
+	Las virtual table fueron creadas por el replication task para cargue inicial/full
+	Stage table: STG_COEP
+	Hecho destino: FT_COEP
+   *************************************/
+	Declare V_SQL NVARCHAR(500);
+	Declare SociedadCO VARCHAR(4) = '6100';
+	Declare n bigint;
+	Declare pBUKRS VARCHAR(10) = '6A00';
+	Declare pEmpresa SMALLINT = 28;
+	
+	--DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       --SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+       
+		--Extracción del detalle de documentos, máximo hasta 1 millón de registros por cada iteración
+		V_SQL=	'insert into KOBA_HDI_DB_1.STG_ABAP_COEP(KOKRS,BELNR,BUZEI,GSBER,PERIO,KSTAR,REFBZ,WERKS,MATNR,REFBZ_FI,WTGBTR,MBGBTR,BEKNZ,TIMESTMP) '||
+				'SELECT KOKRS,BELNR,BUZEI,GSBER,PERIO,KSTAR,REFBZ,WERKS,MATNR,REFBZ_FI,WTGBTR,MBGBTR,BEKNZ,TIMESTMP '||
+				'FROM KOBA_HDI_DB_1.VT_ABAP_COEP '||
+				'WHERE TIMESTMP>'||:pTIMESTMP_DESDE||' AND TIMESTMP<='||:pTIMESTMP_HASTA||' AND (KSTAR=''4135150000'' OR KSTAR=''4175350000'' OR KSTAR=''4175350200'' ) AND KOKRS='''||:SociedadCO||'''';
+		EXECUTE IMMEDIATE V_SQL;
+		commit;
+
+		select Count(C.BELNR) into n
+		from "STG_ABAP_COEP" C
+		inner join STG_ABAP_COBK H ON H.BELNR  = C.BELNR;
+		
+		IF :n>0 THEN 
+			--Se actualiza el lote cargado para la COEP
+			insert into ETL_CONTROL_CARGUE(TABLA,FECHA_CARGA,ULTIMA_FECHA,BUKRS,BELNR_DESDE,BELNR_HASTA,TIMESTMP_DESDE,TIMESTMP_HASTA,REGISTROS_PROCESADOS,TIPO_CARGA,CARGA_POS)
+			select 'COEP',now(),Max(H.BUDAT),:pBUKRS,Min(C.BELNR),Max(C.BELNR),Min(C.TIMESTMP),Max(C.TIMESTMP),Count(*),:pTipoCarga,''
+			from "STG_ABAP_COEP" C
+			inner join STG_ABAP_COBK H				ON H.BELNR  = C.BELNR
+			--Este Join asegura que no se inserten timestamp de partidas individuales cuyo encabezado de documento aun no ha sido creado
+			inner join DIM_DOCFI D ON H.REFBN = D.CD_BELNR AND H.REFGJ = D.CD_EJERCICIO AND D.CD_DW_EMPRESA = :pEmpresa 
+			where C.TIMESTMP>:pTIMESTMP_DESDE and C.TIMESTMP<=:pTIMESTMP_HASTA;
+			COMMIT;
+		END IF;
+		
+END

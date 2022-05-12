@@ -1,0 +1,79 @@
+PROCEDURE "SP_FT_COEP_LOAD_V001"(pTipoCarga Varchar(1))
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+	DECLARE n int;
+	DECLARE pBUKRS VARCHAR(10) = '6A00';
+	DECLARE pEmpresa SMALLINT  = 28; 
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+       
+   /*************************************
+	Carga de ingreso contabilizado del POS por material
+	Fecha de Creación:02/12/2019
+	Fecha de Modificación:11/02/2020
+	Creado por: CORG
+
+	Motivo cambio:	11-02-2020 El centro de beneficio se agrega a la DOCFI, para no depender de la STG_FAGLFLEXA, debido a que en el cargue full de solo la COEP sino se cargaba la Flexa no se cargaba la COEP
+								Solo se cargan los ingresos. Los costos no se cargan porque no coinciden con el que se calcula al momento de la carga del POS
+					06/11/2020 Por falta de memoria, se retira MERGE. Se reemplaza por indicador de carga CO_ITEMS en la cabecera del doc. FI.
+	Stage table: STG_ABAP_COEP,STG_ABAP_COBK
+	Hecho destino: FT_COEP
+   *************************************/
+   
+	Partidas_CO=SELECT	:pEmpresa CD_DW_EMPRESA, 
+						Max(F.TIMESTMP) TIMESTMP, 
+						Max(F.BELNR) BELNR,
+						max(H.REFGJ) CD_EJERCICIO,
+						Max(D.CD_EJERCICIO*100+MONTH(D.FE_BUDAT)) CD_PERIODO, 
+						D.CD_DW_BKPF,
+						min(ifnull(M.CD_DW_MATERIAL,0)) CD_DW_MATERIAL,
+						Max(C.CD_DW_CUENTA) CD_DW_CUENTA,
+						max(D.FE_BUDAT) FE_BUDAT,
+						cast(F.REFBZ as smallint) CD_ITEM,
+						max(F.WERKS) CD_CENTRO,
+						max(F.GSBER) CD_GSBER,
+						'COP' CD_MONEDA, 
+						Sum(F.WTGBTR*100) VL_WTGBTR,	--VALOR MOVIMIENTO 
+						Sum(F.MBGBTR) VL_MBGBTR 		--CANTIDAD 
+				FROM STG_ABAP_COEP F
+				INNER JOIN STG_ABAP_COBK H				ON H.BELNR  = F.BELNR
+				INNER JOIN DIM_CUENTA C				ON C.CD_CUENTA = F.KSTAR
+				INNER JOIN DIM_DOCFI D				ON D.CD_BELNR = H.REFBN 	
+													AND H.REFGJ = D.CD_EJERCICIO		--Como mejor práctica siempre se debe filtrar por la partición
+													AND H.BLART=D.CD_BLART 
+													AND D.CD_DW_EMPRESA=:pEmpresa
+													AND D.CO_ITEMS < 1					--Indica que solo los documentos que no han sido previamente cargados
+				LEFT JOIN DIM_MATERIAL M 			ON M.CD_MATERIAL=F.MATNR
+				WHERE (C.CD_GRUPOCUENTA='41')
+				GROUP BY D.CD_DW_BKPF,D.CD_EJERCICIO,cast(F.REFBZ as smallint);
+
+	select Count(*) into n from :Partidas_CO;
+	if n >0 then
+
+		insert into FT_COEP (CD_DW_BKPF,CD_ITEM,CD_PERIODO,CD_DW_EMPRESA,CD_DW_MATERIAL,CD_DW_CUENTA,FE_BUDAT,CD_CENTRO,VL_WTGBTR,VL_MBGBTR)
+		select S.CD_DW_BKPF,S.CD_ITEM,S.CD_PERIODO,S.CD_DW_EMPRESA,S.CD_DW_MATERIAL,S.CD_DW_CUENTA,S.FE_BUDAT,S.CD_CENTRO,S.VL_WTGBTR,S.VL_MBGBTR
+		from :Partidas_CO S;
+		COMMIT;
+		
+		--Datos de control
+		--Se actualiza para cada documento cargado, el # de posiciones y el timestamp del detalle documento (generalmente diferente al del encabezado)
+		MERGE INTO DIM_DOCFI D 
+		USING (SELECT CD_DW_BKPF, CD_EJERCICIO, MAX(CD_ITEM) CO_ITEMS, Max("TIMESTMP") TIMESTMP_CO1, Max(BELNR) CO_BELNR1 FROM :Partidas_CO GROUP BY CD_DW_BKPF, CD_EJERCICIO) F 
+			ON F.CD_DW_BKPF  = D.CD_DW_BKPF 
+			AND F.CD_EJERCICIO = D.CD_EJERCICIO  --Por mejor práctica, se debe hacer join indicando la partición (AÑO)
+		WHEN MATCHED THEN UPDATE SET
+			D.CO_ITEMS = F.CO_ITEMS,			--Cantidad de posiciones del documento FI (BKPF)
+			D.TIMESTMP_CO1 = F.TIMESTMP_CO1,	--Último Timestamp de las posiciones
+			D.CO_BELNR1 = F.CO_BELNR1;			--Último documento CO
+		COMMIT;
+		
+		insert into ETL_CONTROL_CARGUE(TABLA,FECHA_CARGA,TIPO_CARGA,BUKRS,GJAHR,BELNR_DESDE,BELNR_HASTA,TIMESTMP_DESDE,TIMESTMP_HASTA,ULTIMA_FECHA,REGISTROS_PROCESADOS)
+		select 'FT_COEP',now(),:pTipoCarga,:pBUKRS,Max(CD_EJERCICIO),Min(BELNR),Max(BELNR),Min(TIMESTMP),Max(TIMESTMP),Max(FE_BUDAT),Count(CD_DW_BKPF)
+		from :Partidas_CO S;
+		COMMIT;
+		
+	end if;
+	
+END

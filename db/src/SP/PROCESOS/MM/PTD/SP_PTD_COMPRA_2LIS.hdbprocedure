@@ -1,0 +1,94 @@
+PROCEDURE "SP_PTD_COMPRA_2LIS"( )
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+      Cargue delta de las compras según los 2LIS_02
+      Ejecutado por el proceso en CPI-DI de nombre: 6_P_COMPRA
+   *************************************/
+ 	--Declaración de Cursores de periodos y particiones de compras a actualizar
+	DECLARE CURSOR cursor_periodos_compra FOR
+	SELECT DISTINCT ETL.PERIODO, PART_ID
+	FROM STG_2LIS_02_ITM TTM 
+	INNER JOIN ETL_PARTICIONES ETL 
+		ON ETL.PERIODO = substring(BEDAT,1,6)
+		AND ETL.TABLA = 'FT_COMPRA';
+
+	DECLARE CURSOR cursor_periodos_inventario FOR
+	SELECT DISTINCT ETL.PERIODO, PART_ID
+	FROM STG_2LIS_03_BF TTM 
+	INNER JOIN ETL_PARTICIONES ETL 
+		ON ETL.PERIODO = substring(BUDAT,1,6)
+		AND ETL.TABLA = 'FT_MSEG';
+		
+	DECLARE CURSOR cursor_periodos_entrega FOR
+	SELECT DISTINCT ETL.PERIODO, PART_ID
+	FROM STG_2LIS_02_SCL SCL 
+	INNER JOIN ETL_PARTICIONES ETL 
+		ON ETL.PERIODO = substring(SCL.BEDAT,1,6)
+		AND ETL.TABLA = 'FT_COMPRA';
+
+   	--Periodos de compra que cambian
+	DECLARE CURSOR cursor_periodos_recibido FOR
+	SELECT ETl.PERIODO,ETL.PART_ID
+	FROM STG_2LIS_03_BF STG
+	INNER JOIN DIM_COMPRA DIM ON DIM.CD_EBELN = STG.EBELN
+	INNER JOIN ETL_PARTICIONES ETL 
+			ON ETL.PERIODO = TO_VARCHAR(DIM.FE_AEDAT,'YYYYMM')
+			AND ETL.TABLA = 'FT_COMPRA_INVENTARIO'
+	GROUP BY ETl.PERIODO,ETL.PART_ID;
+	
+	--Inicio de los procesos de actualización
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+
+	--Los 2LIS_02_ITM y 2LIS_02_SCL se cargan cada 3600 segundos según intervalo definido en las tareas de replicación.
+	DELETE	FROM STG_2LIS_02_ITM WHERE MATNR=''; --Se eliminan los registros de compras que no sean de materiales de venta
+	DELETE	FROM STG_2LIS_02_SCL WHERE (MATNR='' OR EKGRP='KZZ'); --Se eliminan los registros de compras que no sean de materiales de venta
+	DELETE  FROM STG_2LIS_03_BF  WHERE NOT BSTAUS='A'; --(A=Unrestricted Use). Se borran los BSTAUS F=Stock Transfer, H=Transit, V=Consumption
+	COMMIT;
+
+	--Carga de los encabezados de compra
+	--Se insertan los nuevos encabezados de documentos de compra
+	INSERT INTO DIM_COMPRA(CD_EBELN, CD_EJERCICIO, CD_EKGRP, FE_BEDAT, FE_AEDAT, CD_BSART, FL_BSTYP, CD_LIFNR,CD_LLIEF, FL_STATU, CD_RESWK, NM_ERNAM)   
+	SELECT 	DET.EBELN, substring(DET.BEDAT,1,4), DET.EKGRP, DET.BEDAT, DET.BEDAT, DET.BSART, DET.BSTYP,DET.LIFNR, DET.LLIEF, DET.STATU, DET.RESWK, DET.AFNAM
+	FROM (	SELECT 	DISTINCT EBELN, EKGRP, BEDAT, BSART, BSTYP, LIFNR, LLIEF, STATU, RESWK, AFNAM  
+			FROM STG_2LIS_02_ITM) DET 
+	LEFT JOIN DIM_COMPRA COM 
+		ON COM.CD_EBELN = DET.EBELN
+	WHERE COM.CD_EBELN IS NULL;
+	COMMIT;  
+
+	--Carga de los encabezados de movimiento de inventario
+	MERGE INTO DIM_DOCMM D
+	USING ( select 	DISTINCT M.MBLNR CD_MBLNR,M.MJAHR CD_EJERCICIO,M.BLDAT FE_BLDAT,M.BUDAT FE_BUDAT, 28 CD_DW_EMPRESA
+			from STG_2LIS_03_BF M) T 
+			ON T.CD_MBLNR = D.CD_MBLNR AND T.CD_EJERCICIO = D.CD_EJERCICIO
+	WHEN NOT MATCHED THEN INSERT (CD_MBLNR,CD_EJERCICIO,FE_BLDAT,FE_BUDAT,CD_DW_EMPRESA)
+	VALUES (T.CD_MBLNR,T.CD_EJERCICIO,T.FE_BLDAT,T.FE_BUDAT,T.CD_DW_EMPRESA);
+	COMMIT;
+
+	FOR cur_inventario_row AS  cursor_periodos_inventario DO
+		SP_FT_MSEG_LOAD_2LIS_03_BF(cur_inventario_row.PERIODO, cur_inventario_row.PART_ID);
+	END FOR;
+	
+	FOR cur_recibido_row AS  cursor_periodos_recibido DO
+		SP_FT_COMPRA_LOAD_2LIS_03_BF(cur_recibido_row.PERIODO, cur_recibido_row.PART_ID);
+	END FOR;
+	
+	--Operaciones por cada partición en compras
+	--Los periodos de compra pueden ser diferentes a los periodos en el extractor de entrega programada, debido al flag de entrega total.
+	--Para cada periodo de compra en el extractor se insertan/actualizan los documentos de compra
+	FOR cur_compra_row AS cursor_periodos_compra DO	
+		SP_FT_COMPRA_LOAD_2LIS_02_ITM(cur_compra_row.PERIODO, cur_compra_row.PART_ID);
+	END FOR;
+	
+	--Para cada periodo de enrtega programada de la compra, se actualizan la fecha programada de entrega y el flag de entrega total para los documentos de compra
+	--Este proceso carga tanto las fechas de entrega como el inventario recibido si es una entrega finalizada
+	FOR cur_entrega_row AS cursor_periodos_entrega DO	
+		SP_FT_COMPRA_LOAD_2LIS_02_SCL(cur_entrega_row.PERIODO, cur_entrega_row.PART_ID);
+	END FOR;
+
+	
+END

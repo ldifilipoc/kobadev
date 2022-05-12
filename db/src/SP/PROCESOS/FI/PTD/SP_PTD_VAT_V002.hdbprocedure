@@ -1,0 +1,63 @@
+PROCEDURE "SP_PTD_VAT_V002"(PERIODO INT) --Ejemplo 202101
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+/*
+	Este procedimiento calcula el VAT (IVA más Impoconsumo) de las clases de documento y cuentas definidas por KOBA
+	Los resultados de esta tabla se usan en el Tenant de Valorem para los datos del Monthly, como tambien para el reporte en Excel de KOBA Monthly
+	En el evento de una nueva clase de documento debe ingresarlo en la tabla ETL_TRADUCCION, codigo CD_TABLA = 1
+	
+*/
+    Declare pEmpresa smallint=28;
+    Declare pBUKRS_L VARCHAR(4)='6A0L';
+	Declare pDESDE1 DATE;
+	Declare pHASTA2 DATE;
+	Declare pBUKRS VARCHAR(4)= '6A00';
+	Declare Fecha_Mes DATE = LAST_DAY(TO_VARCHAR(:PERIODO)||'01');
+	
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+       
+	DELETE FROM FT_VAT WHERE FE_FISCPER = :Fecha_Mes;
+
+	--Los documentos sin CEBE se actualizan con uno de los CEBE de las líneas del Documento para que al generar el VAT por tienda, no se vaya alguno vacío.
+	MERGE INTO DIM_DOCFI DOC
+	USING (
+	select  B.CD_DW_BKPF, Max(F.CD_DW_CEBE) CEBE_DOC
+	from "FT_FIGLITEM" F 
+	inner join DIM_DOCFI B on F.CD_DW_BELNR = B.CD_DW_BKPF
+	inner join DIM_CUENTA C on C.CD_DW_CUENTA = F.CD_DW_CUENTA
+	inner join ETL_TRADUCCION ETL ON B.CD_BLART = ETL.CD_DIMENSION AND ETL.CD_TABLA=1
+	where F.CD_PERIODO = :PERIODO
+	AND B.CD_DW_CEBE IS NULL
+	group by B.CD_DW_BKPF,  B.CD_DW_CEBE) DET ON DOC.CD_DW_BKPF = DET.CD_DW_BKPF
+	WHEN MATCHED AND DOC.CD_DW_CEBE IS NULL THEN UPDATE SET DOC.CD_DW_CEBE = DET.CEBE_DOC;
+
+	COMMIT;
+	
+	VAT =	select 28 CD_DW_EMPRESA,C."CD_DW_CUENTA",P.CD_DW_CEBE, LAST_DAY(F.FE_BUDAT) FE_FISCPER,B.CD_BLART, Sum(F."VL_HSL"*100) VL_TURNOVER
+			from "FT_FIGLITEM" F 
+			inner join DIM_DOCFI B on F.CD_DW_BELNR = B.CD_DW_BKPF
+			inner join ETL_TRADUCCION ETL ON B.CD_BLART = ETL.CD_DIMENSION AND ETL.CD_TABLA=1
+			inner join DIM_CUENTA C on C.CD_DW_CUENTA = F.CD_DW_CUENTA AND C.CD_CONCEPTO='KPI0101'
+			inner join DIM_CEBE_PRCTR P on B.CD_DW_CEBE= P.CD_DW_CEBE
+			where F."CD_PERIODO" = :PERIODO
+			group by C."CD_DW_CUENTA",P.CD_DW_CEBE,LAST_DAY(F.FE_BUDAT),B.CD_BLART;
+	
+	merge into "FT_VAT" V
+	using :VAT S ON S.CD_DW_EMPRESA = V.CD_DW_EMPRESA 
+		and S.CD_DW_CUENTA = V.CD_DW_CUENTA 
+		and S.CD_DW_CEBE = V.CD_DW_CEBE
+		and S.CD_BLART = V.CD_BLART
+		and S.FE_FISCPER = V.FE_FISCPER
+	when matched then update set V.VL_TURNOVER = S.VL_TURNOVER
+	when not matched then insert ("CD_DW_EMPRESA","CD_DW_CUENTA","CD_DW_CEBE","FE_FISCPER","CD_BLART","VL_TURNOVER")
+	values (S."CD_DW_EMPRESA",S."CD_DW_CUENTA",S."CD_DW_CEBE",S."FE_FISCPER",S."CD_BLART",S."VL_TURNOVER");
+	
+	insert into ETL_CONTROL_CARGUE(TABLA,FECHA_CARGA,BUKRS,GJAHR,BELNR_DESDE,BELNR_HASTA,TIMESTMP_DESDE,TIMESTMP_HASTA,ULTIMA_FECHA,REGISTROS_PROCESADOS)
+	select 'FT_VAT',now(),:pBUKRS,Year(Max(S.FE_FISCPER)),'','',0,0,Max(S.FE_FISCPER),Count(S.FE_FISCPER)
+	from :VAT S;
+	COMMIT;
+	
+END 

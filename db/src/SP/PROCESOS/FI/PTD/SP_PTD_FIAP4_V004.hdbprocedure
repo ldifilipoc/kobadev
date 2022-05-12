@@ -1,0 +1,27 @@
+PROCEDURE "SP_PTD_FIAP4_V004"
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+	/*	
+		Proceso que toma datos de la tabla STG_0FI_AP4 que es una tabla que se llena con el RT de forma Delta
+	
+		Queda pendiente borrar las modificaciones de esta tabla delta para no recargar todo el tiempo lo mismo
+	*/
+   
+   DECLARE CURSOR Cursor_ANIO FOR	--Cursor para Merge de documentos compensados o modificados
+	SELECT ETL.PART_ID particion, STG.GJAHR, Count(DISTINCT STG.BELNR) Cantidad  
+	FROM STG_0FI_AP4 STG 
+	INNER JOIN ETL_PARTICIONES ETL 
+		ON ETL.TABLA = 'FT_0FIAP4'
+		AND ETL.PERIODO =  STG.GJAHR
+	GROUP BY ETL.PART_ID, STG.GJAHR;
+	
+	FOR Cursor_ANIO_row AS Cursor_ANIO DO
+	
+		CALL  SP_PTD_FIAP4_V005(Cursor_ANIO_row.GJAHR, Cursor_ANIO_row.particion);
+		
+	END FOR;
+ 
+    
+END

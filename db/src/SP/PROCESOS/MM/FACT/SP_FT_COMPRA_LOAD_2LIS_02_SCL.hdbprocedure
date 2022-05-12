@@ -1,0 +1,110 @@
+PROCEDURE "SP_FT_COMPRA_LOAD_2LIS_02_SCL"(pPeriodo INT, pPart_ID SMALLINT)
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+	Actualización de la Fecha de Entrega de fuente 2LIS_02_SCL
+	
+	--Por Documento y Posición de compra
+	
+	--Otros campos relevantes no solicitados:
+	--EREKZ, --Final Invoice Indicator
+	--BANFN, --Purchase Requisition Number
+	--BNFPO, --Item Number of Purchase Requisition
+	--ETENR	 --Schedule Line Counter	
+	--ETENR = '0002' Solo vienen items para el KZZ (Sol. Traslado de Ped.) 
+	--Se excluyen las fechas de entrega de los documentos KZZ (Sol. Traslado de Ped. CEDI->Tienda).
+	
+	Fecha de Creación: 30/03/2020
+	Fecha de Modificación: 02/04/2020
+	Creado por: CORG-MREDONDO
+	Modifica:
+	Motivo cambio: Manejo de Deltas
+
+	Stage table: STG_2LIS_02_SCL
+	Hecho destino: FT_COMPRA
+   *************************************/
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+     
+
+	--Los datos de entrega están filtrados para EKORG = '6A00' 
+	TENTREGA = 		SELECT 	ROW_NUMBER() OVER (PARTITION BY EBELN, EBELP ORDER BY SYDAT Desc, UZEIT, BUDAT DESC ) ULTIMO_REGISTRO,
+							--EKGRP,BANFN,BNFPO,UMREZ,UMREN,MEINS,NETPR,BUDAT,BEDAT,
+							EBELN, 
+							EBELP,
+							BEDAT,
+							cast(substring(BEDAT,1,6) as int) PERIODO,
+							cast(substring(BEDAT,1,4) as int) EJERCICIO,
+							ELIKZ, --Final Delivery Indicator
+							EINDT, --Item Delivery Date
+							SLFDT  --Delivery Date Relevant for Statistics
+					FROM STG_2LIS_02_SCL sls
+					WHERE cast(substring(BEDAT,1,6) as int) = :pPeriodo; 
+					
+	MERGE INTO FT_COMPRA PARTITION(:pPart_ID) A
+	USING :TENTREGA F ON A.CD_EBELN 		= F.EBELN 
+					 AND A.CD_ITEM 			= F.EBELP 
+					 AND A.CD_PERIODO		= F.PERIODO
+	WHEN MATCHED AND ULTIMO_REGISTRO=1 THEN UPDATE 
+			SET FE_EINDT	= F.EINDT, 
+				FE_SLFDT	= F.SLFDT,
+				FL_ELIKZ	= F.ELIKZ;
+	COMMIT;
+	
+	--Para llevar un control de posiciones cargadas, se establece la cantidad de posiciones de la entrega programada
+	MERGE INTO DIM_COMPRA D 
+	USING ( SELECT EBELN, EJERCICIO, Count(EBELP) Cant
+			FROM :TENTREGA 
+			GROUP BY EBELN, EJERCICIO) DET 
+	ON DET.EBELN = D.CD_EBELN
+	AND DET.EJERCICIO = D.CD_EJERCICIO
+	WHEN MATCHED THEN UPDATE SET NU_ITEMS_ENTREGA = Cant; 
+
+	--Actualización de la mercancía recibida según el historial de pedido FT_COMPRA_INVENTARIO (Fuente Original: Tabla MSEG)
+	--Se actualizan las compras marcadas con la entrega final ELIKZ ='X'
+	Recibido =	SELECT 	FT.CD_EBELN, 
+						FT.CD_EBELP,
+						STG.EJERCICIO,
+						SUM(CASE WHEN FT."FL_SHKZG"='H' THEN FT."NU_MENGE"*-1 ELSE FT."NU_MENGE" END) CANT_RECIBIDA,
+						Max(FT.FE_FECHA) FECHA_CONTABILIZACION_DOC 
+				FROM FT_COMPRA_INVENTARIO FT
+				INNER JOIN (SELECT DISTINCT EBELN, EBELP, PERIODO , EJERCICIO
+							FROM :TENTREGA 
+							WHERE ULTIMO_REGISTRO=1 AND ELIKZ ='X') STG 
+					ON STG.EBELN = FT.CD_EBELN 
+					AND STG.EBELP = FT.CD_EBELP
+					AND STG.PERIODO = FT.CD_PERIODO
+				WHERE FT.CD_PERIODO =  :pPeriodo
+				GROUP BY STG.EJERCICIO, FT.CD_PERIODO,FT.CD_EBELN, FT.CD_EBELP;
+			
+	MERGE INTO FT_COMPRA PARTITION(:pPart_ID) COMPRA
+	USING :Recibido DET 
+		ON DET.CD_EBELN  = COMPRA.CD_EBELN  
+		AND DET.CD_EBELP = COMPRA.CD_ITEM
+	WHEN MATCHED THEN UPDATE 
+		SET NU_RECIBIDO 	  = CANT_RECIBIDA,
+			FE_ULTIMA_ENTREGA = FECHA_CONTABILIZACION_DOC;
+	COMMIT;
+  
+	--Para llevar un control de posiciones cargadas, se establece la cantidad de posiciones en los documentos MM
+	MERGE INTO DIM_COMPRA D 
+	USING ( SELECT CD_EBELN, EJERCICIO, Count(CD_EBELP) Cant
+			FROM :Recibido 
+			GROUP BY CD_EBELN,EJERCICIO) DET 
+	ON DET.CD_EBELN = D.CD_EBELN
+	AND DET.EJERCICIO = D.CD_EJERCICIO
+	WHEN MATCHED THEN UPDATE SET NU_ITEMS_RECIBIDO = Cant; 
+		
+	DELETE FROM STG_2LIS_02_SCL
+	WHERE EBELN IN (SELECT Distinct EBELN FROM :TENTREGA);
+	COMMIT;
+	
+	INSERT INTO ETL_CONTROL_CARGUE(TABLA,TIPO_CARGA,FECHA_CARGA,BUKRS,GJAHR,BLART,BELNR_DESDE,BELNR_HASTA,ULTIMA_FECHA,REGISTROS_PROCESADOS)
+	select 'FT_COMPRA_2LIS_02_SCL','D',add_seconds(now(),-18000),'6A00',Max(EJERCICIO),'',Min(EBELN),Max(EBELN),Max(F.BEDAT),Count(EBELN)
+	from :TENTREGA F ;
+	
+	COMMIT;
+	
+END

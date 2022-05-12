@@ -1,0 +1,148 @@
+PROCEDURE "SP_PTD_FIGL14"()
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+    DECLARE n int;
+    DECLARE pDesde bigint;
+    DECLARE pHasta bigint;
+    DECLARE pTimeStamp1 DECIMAL(15);
+    DECLARE pTimeStamp2 DECIMAL(15);
+    DECLARE pDia DATE;
+    DECLARE pCantidad INT;
+    DECLARE pEjercicio INT;
+    DECLARE Consecutivo INT;
+    
+	DECLARE CURSOR Cursor_Movimiento_POS FOR --Cursor para cargue de documentos en lotes de 999 mil registros como máximo 
+	SELECT BLART, FISCPER, Min(BELNR) BELNR_Desde, Max(BELNR) BELNR_Hasta
+	FROM STG_0FI_GL_14
+	WHERE BLART IN ('I1', 'WA')
+	GROUP BY BLART, FISCPER,LEFT(BELNR,7);
+
+	DECLARE CURSOR Cursor_BELNR FOR	--Cursor para Merge de documentos compensados o modificados (en el tercero) que no son del POS
+	SELECT ETL.PART_ID, STG.FISCPER, Count(DISTINCT STG.BELNR) Cantidad  
+	FROM STG_0FI_GL_14 STG 
+	INNER JOIN ETL_PARTICIONES ETL 
+		ON ETL.TABLA = 'FT_FIGL014'
+		AND ETL.PERIODO =  (CASE WHEN STG.FISCPER <= '2018011' THEN '201001' ELSE GJAHR || RIGHT(POPER,2) END) --Si es un periodo anterior a 201812 la partición sería 1 o 201001
+	GROUP BY ETL.PART_ID, STG.FISCPER;
+
+	--DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    --   SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+
+	
+	--*************************************************************** NUEVOS DATOS MAESTROS***************************************************************
+	--Se verifica si existe un nuevo centro de costos, de beenficio o cuenta contable antes de seguir.
+	--Este paso es redundante porque previamente se han cargado los datos maestros, sin embargo se realiza un doble check.
+
+	--Se obtiene el máximo consecutivo ingresado en el maestro de CEBE
+	select Max(CD_DW_CEBE) into Consecutivo from "DIM_CEBE_PRCTR";
+	
+	--Nuevos CEBE
+	INSERT INTO DIM_CEBE_PRCTR(CD_DW_CEBE, CD_CEBE,NM_CEBE,NM_CEBE_ST,CD_EMPRESA, CD_DIVISION, CD_JERARQUIA3)
+	SELECT :Consecutivo + ROW_NUMBER() OVER (ORDER BY PRCTR) Consecutivo, PRCTR,PRCTR,PRCTR,CO_EMPRESA,DIVISION,DIVISION
+	FROM (	SELECT DISTINCT PRCTR , KOKRS CO_EMPRESA, GSBER DIVISION
+			FROM STG_0FI_GL_14 STG 	
+			INNER JOIN DIM_EMPRESA EMP ON STG.BUKRS = EMP.CD_EMPRESA
+			LEFT JOIN DIM_CEBE_PRCTR D 	ON D.CD_CEBE = STG.PRCTR 
+			WHERE D.CD_DW_CEBE IS NULL) NUEVOS;
+	COMMIT;
+	
+	
+	--Nuevas cuentas
+	Nuevas_Cuentas =
+			SELECT DISTINCT HKONT CD_CUENTA	FROM STG_0FI_GL_14 STG LEFT JOIN DIM_CUENTA CTA ON CTA.CD_CUENTA = STG.HKONT WHERE CTA.CD_DW_CUENTA IS NULL	AND HKONT!=''
+			UNION
+			SELECT DISTINCT KONTO CD_CUENTA FROM STG_0FI_GL_14 STG LEFT JOIN DIM_CUENTA CTA ON CTA.CD_CUENTA = STG.KONTO WHERE CTA.CD_DW_CUENTA IS NULL	AND KONTO !=''				
+			UNION
+			SELECT DISTINCT KSTAR CD_CUENTA	FROM STG_0FI_GL_14 STG LEFT JOIN DIM_CUENTA CTA ON CTA.CD_CUENTA = STG.KSTAR WHERE CTA.CD_DW_CUENTA IS NULL	AND KSTAR !=''	
+			UNION
+			SELECT DISTINCT SAKNR CD_CUENTA FROM STG_0FI_GL_14 STG LEFT JOIN DIM_CUENTA CTA ON CTA.CD_CUENTA = STG.SAKNR WHERE CTA.CD_DW_CUENTA IS NULL	AND SAKNR !='';
+			
+	SELECT Max(CD_DW_CUENTA) INTO Consecutivo FROM DIM_CUENTA;
+	
+	insert into DIM_CUENTA(CD_DW_CUENTA, CD_CUENTA,NM_CUENTA,CD_TIPO_CUENTA,CD_CLASE, NM_CLASE, CD_GRUPOCUENTA,CD_CONCEPTO,NM_CONCEPTO,TIPO_INFORME)
+	select	:Consecutivo + ROW_NUMBER() OVER (ORDER BY C.CD_CUENTA) Consecutivo,
+			C.CD_CUENTA, 
+			C.NM_CUENTA,
+			(case substr(C.CD_CUENTA,1,1) when '1' then 'AST' 
+			when '2' then 'LEQ' when '3' then 'LEQ' when '4' then 'INC' when '5' then 'EXP' when '6' then 'EXP' when '7' then 'EXP'
+			else 'NFI' end) CD_TIPO_CUENTA,
+			substr(C.CD_CUENTA,0,1), 
+			(CASE substr(C.CD_CUENTA,0,1) 
+				WHEN '1' THEN 'ACTIVO' 
+				WHEN '2' THEN 'PASIVO' 
+				WHEN '3' THEN 'PATRIMONIO' 
+				WHEN '4' THEN 'INGRESO' 
+				WHEN '5' THEN 'GASTO' 
+				WHEN '6' THEN 'COSTO'
+			END), 
+			substr(C.CD_CUENTA,0,2),'N.A','N.A',
+			(case when substr(C.CD_CUENTA,1,1) IN ('1','2','3') then 'B' else 'P' end)
+	from (	SELECT DISTINCT CD_CUENTA, CD_CUENTA NM_CUENTA
+			FROM :Nuevas_Cuentas STG) C;
+	COMMIT;
+	
+	--Nuevos CECOS
+	select Max(CD_DW_CECO) into Consecutivo from "DIM_CECO";
+	
+	INSERT INTO "DIM_CECO"(CD_DW_CECO,CD_CECO,"CD_EMPRESA","NM_CECO","NM_CECO_ST","FE_DATETO","FE_DATEFROM","FE_CREACION", CD_JERARQUIA3)
+	select :Consecutivo + ROW_NUMBER() OVER (ORDER BY KOSTL) Consecutivo,
+			KOSTL, BUKRS, KOSTL, KOSTL, '20000101' , '20991231' ,'20991231',''
+	from (		
+	select DISTINCT KOSTL, BUKRS
+	FROM STG_0FI_GL_14 STG 
+	LEFT JOIN DIM_CECO CECO
+		ON ((CECO.CD_CECO = STG.KOSTL))
+	WHERE NOT STG.KOSTL='' AND CECO.CD_DW_CECO IS NULL) NUEVOS;
+	COMMIT;
+	
+	--Se crean primero los encabezados de documentos nuevos	
+	Documentos =	SELECT 	Min(EMP.CD_DW_EMPRESA) CD_DW_EMPRESA, STG.GJAHR, STG.BELNR, STG.BLART, Max(STG.BLDAT) BLDAT, Max(STG.BUDAT) BUDAT, Max(STG.CPUDT) CPUDT, 
+							RIGHT(Max(STG."TIMESTAMP"), 6) CPUTM, Max(WAERS) WAERS, Max(XBLNR) XBLNR, 
+							Max(BSTAT) BSTAT, Max(AWTYP) AWTYP,	Max(AWKEY) AWKEY, BUKRS, Max(LDGRP) LDGRP, Max(HWAER) HWAER, Max(STG."TIMESTAMP") "TIMESTMP"
+					FROM STG_0FI_GL_14 STG
+					INNER JOIN DIM_EMPRESA EMP
+						ON EMP.CD_EMPRESA = STG.BUKRS 
+					GROUP BY STG.GJAHR, BUKRS, STG.BELNR, STG.BLART;
+	 	
+	MERGE INTO DIM_DOCFI DIM
+	USING :Documentos DET 
+		ON  DET.CD_DW_EMPRESA 	= DIM.CD_DW_EMPRESA
+		AND DET.BELNR 			= DIM.CD_BELNR
+		AND DET.GJAHR 			= DIM.CD_EJERCICIO
+	WHEN MATCHED THEN 
+		UPDATE SET	TIMESTMP = DET."TIMESTMP", 
+					FE_CPUDT = DET.CPUDT, 
+					FE_CPUTM = DET.CPUTM,
+					BSTAT = DET.BSTAT
+	WHEN NOT MATCHED THEN 
+		INSERT (CD_DW_EMPRESA, CD_EJERCICIO, BKTXT, USNAM, XREVERSAL, CD_BELNR, CD_BLART, FE_BLDAT, FE_BUDAT, FE_CPUDT, FE_CPUTM, WAERS, BSTAT, AWTYP, AWKEY, HWAER, TIMESTMP, XBLNR)
+		VALUES(DET.CD_DW_EMPRESA, DET.GJAHR,'FIGL14','NA','', DET.BELNR, DET.BLART, DET.BLDAT, DET.BUDAT, DET.CPUDT, DET.CPUTM, DET.WAERS, DET.BSTAT, DET.AWTYP, DET.AWKEY, DET.HWAER, DET.TIMESTMP, DET.XBLNR);
+	
+	COMMIT;
+	
+	--*************************************************************** DATOS TRANSACCIONALES ***************************************************************
+	
+	--Por control se obtienen los timestamp y la cantidad de documentos a cargar.
+	Select Min("TIMESTAMP"), Max("TIMESTAMP"), Max(BUDAT), Count(Distinct BELNR), CAST(min(GJAHR) AS INT)
+	into pTimeStamp1, pTimeStamp2, pDia, pCantidad, pEjercicio
+	FROM STG_0FI_GL_14;
+
+	FOR cur_POS_row AS Cursor_Movimiento_POS DO
+		--Solo carga movimientos del POS (I1 o WA)
+		CALL SP_FT_FIGLITEM_LOAD_V002(cur_POS_row.FISCPER, cur_POS_row.BELNR_Desde, cur_POS_row.BELNR_Hasta);
+	
+	END FOR;
+
+	FOR cur_BELNR_row AS Cursor_BELNR DO
+		--Se insertan/actualizan las partidas invididuales de cada periodo
+		CALL  SP_FT_FIGL014_LOAD_V001(cur_BELNR_row.FISCPER, cur_BELNR_row.Part_ID);
+		
+	END FOR;
+
+	DELETE FROM STG_0FI_GL_14 
+	WHERE "TIMESTAMP" BETWEEN :pTimeStamp1 AND :pTimeStamp2;
+	
+	COMMIT;
+END

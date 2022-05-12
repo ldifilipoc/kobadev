@@ -1,0 +1,67 @@
+PROCEDURE "SP_PTD_COEP_DELTA_V001_H"()
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+   Igual que SP_PTD_COEP_DELTA_V001 pero con rango de hora
+   *************************************/
+	Declare rango bigint = 1500000;	--Rango de 15' máximo
+	Declare pTIMESTAMP1 varchar(15);
+	Declare pTIMESTAMP2 varchar(15);
+	Declare j bigint =0;
+	Declare i bigint =0;
+	Declare M bigint;
+	Declare N bigint;
+	Declare pTipoCarga Varchar(1)='D';
+	Declare pDESDE1 DATE;
+	Declare pHASTA2 DATE;
+	Declare pEmpresa smallint=28;
+	Declare pBUKRS VARCHAR(4)='6A00';
+	
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+       
+	--Esta función devuelve la fecha/hora a timestamp en el formato de la COEP
+	M= "fn_invert_timestamp"(CURRENT_DATE, '23:59:59').TIMESTMP;
+	
+	--PASO 02: Se obtiene el ultimo timestamp ingresado para el tipo de carga delta para el control del while
+	select top 1 TIMESTMP_HASTA 
+	into pTIMESTAMP1
+	from ETL_CONTROL_CARGUE 
+	where  TABLA='FT_COEP' 
+	and TIPO_CARGA =:pTipoCarga
+	order by FECHA_CARGA desc;
+	
+	i  = CAST(:pTIMESTAMP1 as bigint);	
+	--El proceso se repite por cada día que se desea cargar
+	while :i<=:M do
+	
+		--PASO 3: Se obtiene el ultimpo timestamp ingresado para el tipo de carga delta
+
+		--y se calcula el timestamp + 15', límite de la carga
+		pTIMESTAMP1 = CAST(:i as varchar);
+		j  = CAST(:i as bigint) + (:rango);
+		pTIMESTAMP2 = CAST(:j as varchar);
+		
+		--PASO 4: limpieza de las tablas de stage
+		truncate table STG_ABAP_COEP;
+
+		--PASO 5: Se ejecuta la carga en el Stage
+		CALL SP_STG_COEP_LOAD_V001(:pTipoCarga,:pTIMESTAMP1,:pTIMESTAMP2);
+
+		select Count(*) into N
+		from "STG_ABAP_COEP" C 
+		inner join STG_ABAP_COBK H 
+			ON H.BELNR  = C.BELNR;
+		
+		IF :N>0 THEN 
+			--Se carga en la fact table
+			CALL SP_FT_COEP_LOAD_V001(:pTipoCarga);
+		END IF;
+		--El proceso termina cuando i supera el límite de timestamp que para el proceso delta es la Fecha/Hora Actual 
+		i = :i + :rango;
+		
+	end while;
+
+END

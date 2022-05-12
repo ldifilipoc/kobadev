@@ -1,0 +1,166 @@
+PROCEDURE "SP_JERARQUIA_CEBE_LOAD"
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+   Actualiza la Jerarquía de Cntros de Beneficio
+
+   *************************************/
+	declare NUM int := 0;
+	declare LEV int := 1;
+	declare Tipo_Jerarquia nvarchar(4):='0106'; -- CENTRO BENEFICIO
+	declare Consecutivo int;
+	declare Group_Root_Node nvarchar(10):= 'JCB-GKOBA';
+    declare ControllingArea nvarchar(10):= '6100';	
+	declare Sociedad nvarchar(4):='6A00';
+	
+	--DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    --   SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+       
+	LT_ROOT = SELECT DISTINCT NULL AS PARENT, SETNAME AS GROUP_NODE, NULL AS NODO_ID, 1 AS "LEVEL"
+	FROM "STG_SETNODE"
+	WHERE SETCLASS = :Tipo_Jerarquia and SUBCLASS = :ControllingArea and SETNAME = :Group_Root_Node;
+	
+	LT_ROOT2 = SELECT DISTINCT  NULL AS PARENT, SETNAME AS GROUP_NODE, NULL AS NODO_ID, 1 AS "LEVEL"
+	FROM "STG_SETLEAF"
+	WHERE SETCLASS = :Tipo_Jerarquia and SUBCLASS = :ControllingArea and SETNAME = :Group_Root_Node;
+	
+	LT_HIERARCHY =	SELECT PARENT, GROUP_NODE, NODO_ID, "LEVEL" from :LT_ROOT
+					UNION
+					SELECT PARENT, GROUP_NODE, NODO_ID, "LEVEL" from :LT_ROOT2;
+					
+	--Se repite para multiples niveles
+	while 1 = 1 do
+	
+	LT_HIERARCHY_TMP =	SELECT part.SETNAME AS PARENT, part.SUBSETNAME AS GROUP_NODE, NULL AS NODO_ID, :LEV + 1 AS "LEVEL"
+						FROM :LT_HIERARCHY as main inner join "STG_SETNODE" as part ON (main.GROUP_NODE = part.SETNAME)
+						WHERE part.SETCLASS = :Tipo_Jerarquia and part.SUBCLASS = :ControllingArea and main.LEVEL = :LEV;
+	
+	SELECT COUNT(*) INTO NUM FROM :LT_HIERARCHY_TMP;
+	if :NUM = 0 then
+	       break;
+	end if;
+	
+	LT_HIERARCHY =	SELECT PARENT, GROUP_NODE, NODO_ID,"LEVEL" from :LT_HIERARCHY
+					UNION
+					SELECT PARENT, GROUP_NODE, NODO_ID, "LEVEL" from :LT_HIERARCHY_TMP;
+	
+	LEV := :LEV + 1;
+	end while;
+	
+	LT_CC_TMP = SELECT CC.SETNAME AS PARENT, NULL AS GROUP_NODE, CC.VALOPTION AS VALOPTION, CC.VALFROM as VALFROM, CC.VALTO as VALTO, CC_gr."LEVEL" + 1 AS "LEVEL"
+				FROM :LT_HIERARCHY as CC_gr inner join "STG_SETLEAF" as CC ON (CC_gr.GROUP_NODE = CC.SETNAME)                      
+				WHERE CC.SETCLASS = :Tipo_Jerarquia and CC.SUBCLASS = :ControllingArea;
+	
+	LT_CC = SELECT PARENT, GROUP_NODE, VALFROM AS NODO_ID, LEVEL
+			FROM :LT_CC_TMP;
+	
+	LT_CC_TMP2 =	SELECT CC.PARENT AS PARENT, CC.GROUP_NODE AS GROUP_NODE, CSKS.CD_CEBE AS NODO_ID, CC.LEVEL AS LEVEL
+					FROM :LT_CC_TMP as CC inner join "DIM_CEBE_PRCTR" as CSKS ON (CSKS.CD_CEBE >= CC.VALFROM and CSKS.CD_CEBE <= CC.VALTO);
+	
+	LT_CC = SELECT PARENT, GROUP_NODE, NODO_ID, LEVEL from :LT_CC
+			UNION
+			SELECT PARENT, GROUP_NODE, NODO_ID, LEVEL from :LT_CC_TMP2;
+			
+	var_out =	SELECT PARENT, GROUP_NODE, NODO_ID, LEVEL from :LT_HIERARCHY
+				UNION
+				SELECT PARENT, GROUP_NODE, NODO_ID, LEVEL from :LT_CC;
+				
+	--Se obtiene el último consecutivo para crear los nuevos nodos
+	select Max(CD_DW_CEBE) into Consecutivo
+	from DIM_CEBE_PRCTR;
+	--Se crean los nuevos nodos
+	insert into DIM_CEBE_PRCTR(CD_DW_CEBE, CD_CEBE, NM_CEBE, NM_CEBE_ST, FE_DATETO, FE_DATEFROM,FE_CREACION,CD_EMPRESA)
+	SELECT :Consecutivo + ROW_NUMBER() OVER (ORDER BY PARENT),det.PARENT, det.DESCRIPT, det.DESCRIPT,'29991231','20000101','29991231',:ControllingArea
+	from (
+	SELECT Distinct PARENT, T.DESCRIPT
+	from :var_out V
+	inner join "STG_SETHEADER" T
+	on V.PARENT = T.SETNAME AND SETCLASS = :Tipo_Jerarquia AND T.SUBCLASS =:ControllingArea
+	where V."LEVEL" > 2 AND not V.PARENT is null 
+	AND not V.PARENT IN (select CD_CEBE from DIM_CEBE_PRCTR) --Con esta instrucción se excluyen los nodos ya creados
+	) det;
+
+	UPDATE DIM_CEBE_PRCTR SET CD_JERARQUIA1='', NM_JERARQUIA1='' WHERE CD_EMPRESA=:ControllingArea; --Se inicializa la Jerarquía
+	Commit;
+	
+	--Se Actualiza la Jerarquía 1 con la estructura
+	MERGE INTO DIM_CEBE_PRCTR C
+	USING (
+	select ifnull(V.GROUP_NODE,V.NODO_ID) NODO,V.PARENT,V."LEVEL", T.DESCRIPT
+	from :var_out  V
+	inner join "STG_SETHEADER" T
+	on V.PARENT = T.SETNAME AND SETCLASS = :Tipo_Jerarquia AND T.SUBCLASS =:ControllingArea
+	AND V."LEVEL" > 2 ) J
+	ON J.NODO = C.CD_CEBE
+	WHEN MATCHED THEN UPDATE 
+	SET C.CD_JERARQUIA1 =J.PARENT, C.NM_JERARQUIA1 = J.DESCRIPT;
+	Commit;
+	
+	--Actualización del consecutivo de la jerarquía 1 (no se usa, sin embargo se deja como mejor práctica)
+	MERGE INTO DIM_CEBE_PRCTR H
+	USING DIM_CEBE_PRCTR P
+	ON H.CD_JERARQUIA1 = P.CD_CEBE
+	WHEN MATCHED THEN UPDATE SET H.CD_DW_CEBE_JERARQUIA = P.CD_DW_CEBE;
+	Commit;
+
+	MERGE INTO DIM_CEBE_PRCTR C 
+	USING (	SELECT CB.CD_DW_CEBE, CB.NM_CEBE, ZONA, ZONA_T, REGIONAL, REGIONAL_T 
+			FROM DIM_CEBE_PRCTR CB
+			INNER JOIN (SELECT CD_CEBE CD_ZONA, CD_JERARQUIA1 ZONA, NM_JERARQUIA1 ZONA_T 
+						FROM DIM_CEBE_PRCTR --Se obtienen los papas de los nodos que tienen hijos
+						WHERE FL_ESNODO ='S') ZONA
+				ON ZONA.CD_ZONA = substring(CB.CD_CEBE,1,5)
+			INNER JOIN (SELECT CD_CEBE CD_REGIONAL, CD_JERARQUIA1 REGIONAL, NM_JERARQUIA1 REGIONAL_T 
+						FROM DIM_CEBE_PRCTR --Se obtienen los papas de los nodos que tienen hijos
+						WHERE FL_ESNODO ='S') REG
+				ON REG.CD_REGIONAL = substring(CB.CD_CEBE,1,4)
+			WHERE CB.FL_ESNODO ='N') DET 
+		ON DET.CD_DW_CEBE = C.CD_DW_CEBE 
+	WHEN MATCHED THEN UPDATE SET CD_JERARQUIA3 = REGIONAL, NM_JERARQUIA3= REGIONAL_T,
+								 CD_JERARQUIA4 = ZONA,	NM_JERARQUIA4 = ZONA_T;
+								 
+	--Si es un gasto administrativo de la regional, el 5to caracter es R y no A.
+	MERGE INTO DIM_CEBE_PRCTR C 
+	USING (	SELECT CB.CD_DW_CEBE, CB.NM_CEBE, ZONA, ZONA_T, REGIONAL, REGIONAL_T 
+			FROM DIM_CEBE_PRCTR CB
+			INNER JOIN (SELECT CD_CEBE CD_ZONA, CD_JERARQUIA1 ZONA, NM_JERARQUIA1 ZONA_T 
+						FROM DIM_CEBE_PRCTR
+						WHERE FL_ESNODO ='S') ZONA
+				ON ZONA.CD_ZONA = replace(substring(CB.CD_CEBE,1,5),'R','A') 
+			INNER JOIN (SELECT CD_CEBE CD_REGIONAL, CD_JERARQUIA1 REGIONAL, NM_JERARQUIA1 REGIONAL_T 
+						FROM DIM_CEBE_PRCTR
+						WHERE FL_ESNODO ='S') REG
+				ON REG.CD_REGIONAL = substring(CB.CD_CEBE,1,4)
+			WHERE CB.FL_ESNODO ='N' AND CD_JERARQUIA4 IS NULL) DET 
+		ON DET.CD_DW_CEBE = C.CD_DW_CEBE 
+	WHEN MATCHED THEN UPDATE SET CD_JERARQUIA3 = REGIONAL, NM_JERARQUIA3= REGIONAL_T,
+								 CD_JERARQUIA4 = ZONA,	NM_JERARQUIA4 = ZONA_T;
+								 
+	--Centros de Beneficio que corresponden a Nacional e Importados tienen un tratamiento diferente-
+	--La correspondencia con su Zona son los 4 primeros dígitos
+	
+	MERGE INTO DIM_CEBE_PRCTR C 
+	USING (
+	
+			SELECT CB.CD_DW_CEBE, CB.CD_CEBE ,CB.NM_CEBE, ZONA, ZONA_T, REGIONAL, REGIONAL_T 
+			FROM DIM_CEBE_PRCTR CB
+			INNER JOIN (SELECT 	CD_CEBE CD_ZONA, CD_CEBE ZONA, NM_CEBE ZONA_T , 
+								CD_JERARQUIA1 REGIONAL, NM_JERARQUIA1 REGIONAL_T
+						FROM DIM_CEBE_PRCTR
+						WHERE FL_ESNODO ='S') ZONA
+				ON ZONA.CD_ZONA = substring(CB.CD_CEBE,1,4)
+				AND ZONA.REGIONAL = '6000'
+			WHERE CB.FL_ESNODO ='N') DET 
+		ON DET.CD_DW_CEBE = C.CD_DW_CEBE 
+	WHEN MATCHED THEN UPDATE SET CD_JERARQUIA3 = REGIONAL, NM_JERARQUIA3= REGIONAL_T,
+								 CD_JERARQUIA4 = ZONA,	NM_JERARQUIA4 = ZONA_T;	
+	Commit;
+	--Las tiendas de lo que era la regional MOSQUEDA se trasladan a 6050 y CUNDINAMARCA SUR  Zona 6A08	SOACHA
+	UPDATE DIM_CEBE_PRCTR
+	SET CD_JERARQUIA3 = '6050', NM_JERARQUIA3 = 'CUNDINAMARCA SUR',
+		CD_JERARQUIA4 = '6A08', NM_JERARQUIA4 = 'SOACHA'
+	WHERE CD_JERARQUIA3 = '6A0' AND FL_ESNODO = 'N' AND CD_JERARQUIA4 = '6A11'; --Mosquera
+	Commit;
+END

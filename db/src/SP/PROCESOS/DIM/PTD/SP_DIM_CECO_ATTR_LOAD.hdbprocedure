@@ -1,0 +1,56 @@
+PROCEDURE "SP_DIM_CECO_ATTR_LOAD"( )
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+	--DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    --   SELECT ::SQL_ERROR_CODE ERROR_CECOE, ::SQL_ERROR_MESSAGE ERROR_CECO_MSG FROM TDUMMY;	
+   /*************************************
+   CENTROS DE COSTOS
+   
+	Centros de costos de KOBA.
+	Filtros de la tarea de replicación:
+		LANGU='S' 
+		KOKRS = '6100'   
+   *************************************/
+	--Se limpian las tablas de Stage donde se cargarán los datos del ERP
+	--Se replican los datos a la tabla de stage
+	call "RT_0COSTCENTER_TEXT.START_REPLICATION";
+	call "RT_0COSTCENTER_ATTR.START_REPLICATION";
+	
+	--Último nombre válido
+	Last_TXT  = SELECT KOSTL, Max(DATEFROM) DATEFROM FROM STG_0COSTCENTER_TEXT GROUP BY KOSTL;
+	--Último atributo válido
+	Last_ATTR = SELECT KOSTL, Max(DATEFROM) DATEFROM FROM STG_0COSTCENTER_ATTR GROUP BY KOSTL;
+	
+	Ceco =select T.KOSTL CD_CECO, A."GSBER" CD_DIVISION, A."KOSAR" CD_CLASE_CECO, A."PRCTR" CD_CEBE, A."VERAK" NM_RESPONSABLE, A."ABTEI" NM_DPTO, A."BUKRS" "CD_EMPRESA", A."KHINR" "CD_JERARQUIA",
+				 T.TXTMD  NM_CECO, T.TXTSH NM_CECO_ST, A."ERSDA" "FE_CREACION",T.DATETO FE_DATETO, T.DATEFROM FE_DATEFROM
+		  from "STG_0COSTCENTER_ATTR" A 
+		  inner join :Last_ATTR LA 
+			ON LA.KOSTL= A.KOSTL AND  LA.DATEFROM = A.DATEFROM		  
+		  inner join "STG_0COSTCENTER_TEXT"  T 
+			on T.KOSTL= A.KOSTL
+		  inner join :Last_TXT LT 
+			ON LT.KOSTL = T.KOSTL AND LT.DATEFROM = T.DATEFROM;
+		  
+	--Se actualiza el campo división donde el centro de costo coincida con el código del centro de beneficio
+	--Requerido para comparar el reporte ICA con los datos del ERP
+
+	MERGE INTO "DIM_CEBE_PRCTR" B
+	USING :Ceco T ON B.CD_CEBE = T.CD_CECO 
+	WHEN MATCHED THEN UPDATE SET B."CD_DIVISION" = T."CD_DIVISION";
+	COMMIT;
+	
+	--Actualiza Atributos de la Dimensión Centro de Costo según los datos maestros que existan
+	MERGE INTO "DIM_CECO" C
+	USING :Ceco A ON C.CD_CECO = A.CD_CECO  
+	WHEN MATCHED THEN UPDATE SET C."CD_DIVISION"= A."CD_DIVISION", C."CD_CLASE_CECO" = A."CD_CLASE_CECO", C."NM_CECO"=A.NM_CECO, C."NM_CECO_ST"=A.NM_CECO_ST, C.CD_JERARQUIA = A.CD_JERARQUIA,C."CD_EMPRESA" = A."CD_EMPRESA", 
+								 C."NM_RESPONSABLE" = A."NM_RESPONSABLE" , C."NM_DPTO" = A."NM_DPTO", C.CD_CEBE = A.CD_CEBE, C."FE_CREACION"= A."FE_CREACION",C.FE_DATEFROM=A.FE_DATEFROM, C.FE_DATETO=A.FE_DATETO; 
+	COMMIT;
+
+	insert into ETL_CONTROL_CARGUE(TABLA,FECHA_CARGA,BUKRS,GJAHR,BELNR_DESDE,BELNR_HASTA,TIMESTMP_DESDE,TIMESTMP_HASTA,ULTIMA_FECHA,REGISTROS_PROCESADOS)
+	select 'DIM_CECO',now(),'0000',substr(Max(ERSDA),0,4),'','',0,0,Max(ERSDA),Count(*)
+	from STG_0COSTCENTER_ATTR;
+	COMMIT;
+
+END

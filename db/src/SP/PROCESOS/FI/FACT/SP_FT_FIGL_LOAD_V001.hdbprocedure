@@ -1,0 +1,53 @@
+PROCEDURE "SP_FT_FIGL_LOAD_V001"(Periodo varchar(7))
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+       Cargue de la información del periodo
+   *************************************/
+	DECLARE Fecha date;
+	DECLARE pEmpresa SMALLINT =28;
+	
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+       
+    Fecha= LAST_DAY(cast(substr(:Periodo,0,4)||substr(:Periodo,6,2)||'01' as date)); 
+
+	Stage=	select	:pEmpresa CD_DW_EMPRESA,
+					:Fecha FE_FISCPER,
+					ifnull(C."CD_DW_CUENTA",0) CD_DW_CUENTA,
+					ifnull(CB.CD_DW_CEBE,0) CD_DW_CEBE,
+					ifnull(CC.CD_DW_CECO,ifnull(CB.CD_DW_CEBE,0)) CD_DW_CECO,
+					RTCUR CD_MONEDA, 
+					Sum(TURNOVER*100) VL_TURNOVER,
+					Sum(DEBIT*100) VL_DEBITO,
+					Sum(CREDIT*100) VL_CREDITO,
+					Sum("BALANCE"*100) VL_BALANCE
+			from "STG_0FI_GL_10" F
+			LEFT JOIN "DIM_CUENTA" C ON C.CD_CUENTA = F.RACCT 
+			LEFT JOIN "DIM_CEBE_PRCTR" CB ON CB.CD_CEBE = F.PRCTR 
+			LEFT JOIN "DIM_CECO" CC ON CC.CD_CECO = F.RCNTR 
+			group by C."CD_DW_CUENTA",CB.CD_DW_CEBE,CC.CD_DW_CECO,RTCUR;
+	
+	--Se agrega instrucción de eliminación debido a que se generaban inconsistencias en las cifras por ajustes contables.
+	delete from "FT_FIGL" where CD_DW_EMPRESA=:pEmpresa AND FE_FISCPER = :Fecha;
+	commit;
+	
+	merge into "FT_FIGL" F
+	using :Stage S	ON  F.CD_DW_EMPRESA = S.CD_DW_EMPRESA
+					AND	F.CD_DW_CUENTA =S.CD_DW_CUENTA
+					AND F.CD_DW_CEBE =S.CD_DW_CEBE
+					AND F.CD_DW_CECO =S.CD_DW_CECO
+					AND F.FE_FISCPER =S.FE_FISCPER
+					AND F.CD_MONEDA = S.CD_MONEDA
+	when matched then update set F.VL_TURNOVER=S.VL_TURNOVER, F.VL_BALANCE = S.VL_BALANCE, F.VL_DEBITO = S.VL_DEBITO, F.VL_CREDITO = S.VL_CREDITO
+	when not matched then insert ("CD_DW_EMPRESA","CD_DW_CUENTA","CD_DW_CEBE","CD_DW_CECO","FE_FISCPER","CD_MONEDA","VL_TURNOVER","VL_BALANCE", "VL_DEBITO", "VL_CREDITO")
+	values (S."CD_DW_EMPRESA",S."CD_DW_CUENTA",S."CD_DW_CEBE",S."CD_DW_CECO",S."FE_FISCPER",S."CD_MONEDA",S."VL_TURNOVER",S."VL_BALANCE", S."VL_DEBITO", S."VL_CREDITO");
+
+	insert into ETL_CONTROL_CARGUE(TABLA,FECHA_CARGA,BUKRS,GJAHR,BELNR_DESDE,BELNR_HASTA,TIMESTMP_DESDE,TIMESTMP_HASTA,ULTIMA_FECHA,REGISTROS_PROCESADOS)
+	select 'FT_FIGL',now(),'6A00',Year(:Fecha),'','',0,0,:Fecha,Count(CD_DW_CUENTA)
+	from :Stage;
+	COMMIT;
+	
+END

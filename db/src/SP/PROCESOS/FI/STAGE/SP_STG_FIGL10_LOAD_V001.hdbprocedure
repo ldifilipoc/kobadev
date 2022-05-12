@@ -1,0 +1,34 @@
+PROCEDURE "SP_STG_FIGL10_LOAD_V001"(Periodo varchar(7))
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+       Cargue de la información del periodo
+       --Se asigna el CEBE a los CECOS en blanco para evitar errores en la agregación del Monthly
+       --Ajustado el 3/07/2020
+   *************************************/
+	DECLARE V_SQL NVARCHAR(500);
+	DECLARE Fecha date;
+	DECLARE pEmpresa smallint=28;
+
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+    
+    Fecha= LAST_DAY(cast(substr(:Periodo,0,4)||substr(:Periodo,6,2)||'01' as date));   
+    
+	V_SQL =	'insert into KOBA_HDI_DB_1.STG_0FI_GL_10(RBUKRS,RTCUR,RACCT,RCNTR,PRCTR,FISCPER,BALANCE,TURNOVER, DEBIT, CREDIT) '||
+			'SELECT RBUKRS,RTCUR,RACCT,RCNTR,PRCTR,FISCPER,BALANCE,TURNOVER, DEBIT, CREDIT '||
+			'FROM KOBA_HDI_DB_1.VT_0FI_GL_10 '||
+			'WHERE RBUKRS=''6A00'' AND CURTYPE=''10'' AND RLDNR=''0L'' AND FISCPER=''' || :Periodo ||'''';	
+	EXECUTE IMMEDIATE V_SQL;
+	COMMIT;
+	
+	UPDATE STG_0FI_GL_10 SET RCNTR = PRCTR WHERE RCNTR =''; --Se asigna el CEBE a los CECOS en blanco para evitar errores en la agregación del Monthly
+	
+	insert into ETL_CONTROL_CARGUE(TABLA,FECHA_CARGA,BUKRS,GJAHR,BELNR_DESDE,BELNR_HASTA,TIMESTMP_DESDE,TIMESTMP_HASTA,ULTIMA_FECHA,REGISTROS_PROCESADOS)
+	select 'STG_FIGL',now(),'6A00',Year(:Fecha),'','',0,0,:Fecha,Count(RACCT)
+	from STG_0FI_GL_10;
+	COMMIT;
+	
+END

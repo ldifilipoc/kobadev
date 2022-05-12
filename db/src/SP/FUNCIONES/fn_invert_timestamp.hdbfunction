@@ -1,0 +1,12 @@
+FUNCTION "fn_invert_timestamp"(Fecha date, Hora time)
+       RETURNS timestmp varchar(15)
+       LANGUAGE SQLSCRIPT 
+       SQL SECURITY INVOKER AS 
+BEGIN 
+	declare ini date='19000101';
+	declare tm bigint;
+	
+	tm =Hour(Hora)*60*60+Minute(Hora)*60+Second(Hora);
+	tm =(days_between(add_days(ini,32874),Fecha)+2)*86400+:tm;
+	timestmp=CAST(tm as varchar)||'0000';
+END;

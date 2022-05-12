@@ -1,0 +1,119 @@
+PROCEDURE "SP_FT_FIGLITEM_LOAD_V002"(Periodo VARCHAR(7), BELNR_Desde VARCHAR(10), BELNR_Hasta VARCHAR(10))
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+	Carga de partidas individuales de Finanzas para documentos I1 y WA que por su alto volumen se almacenan en una tabla independiente a la FT_FIGL014
+	Fecha de Creación:02/10/2021
+	Creado por: CORG-JPIMIENTA
+
+	Periodo en formato YYYY0MM
+	BELNR_Desde Documento desde (Para no generar error se particiona el Insert en rango de hasta 999.999 líneas a insertar)
+	BELNR_Hasta Documento Hasta
+
+	Motivo cambio:	10/12/2020 CORG. Se agrega instrucción para insertar los datos desde el extractor estándar 0FI_GL_14
+					
+	Stage table: STG_0FI_GL_14
+	Hecho destino: FT_FIGLITEM
+   *************************************/
+    DECLARE n int;
+    DECLARE pEmpresa SMALLINT=28;
+    DECLARE pBUKRS VARCHAR(10)='6A00';
+    DECLARE pFechaaCargar DATETIME;
+    DECLARE pBLART VARCHAR(1);
+    DECLARE pTabla VARCHAR(30);
+    DECLARE m int;
+    
+	FIGL = --Partidas Individuales
+	select	EMP.CD_DW_EMPRESA, 
+			B.CD_DW_BKPF CD_DW_BELNR, 
+			cast(STG.DOCLN as smallint) CD_DW_BUZEI,
+			substr(Max(STG.BUDAT),0,6) CD_PERIODO,
+			MAx(C.CD_DW_CUENTA) CD_DW_CUENTA,
+			ifnull(Max(CECO.CD_DW_CECO),0) CD_DW_CECO,
+			ifnull(Max(CEBE.CD_DW_CEBE),0) CD_DW_CEBE,
+			cast(Max(STG.BUDAT) as date) FE_BUDAT,
+			Max(SHKZG) CD_DRCRK,
+			Max(STG."DMBTR") VL_HSL,--  F."HSL" valor en moneda local
+			Max(STG."DMBE3") VL_OSL, -- F."OSL" valor en otra moneda 
+			Max(STG."TIMESTAMP") "TIMESTAMP", 
+			STG.BELNR,
+			B.CD_EJERCICIO,
+			Max(STG.PRCTR) PRCTR
+	FROM STG_0FI_GL_14 STG
+	inner join DIM_EMPRESA EMP 
+		ON EMP.CD_EMPRESA = STG.BUKRS
+	inner join DIM_DOCFI B 
+			on B.CD_BELNR 		= STG.BELNR 
+			AND B.CD_EJERCICIO	= STG.GJAHR 
+	left join DIM_CUENTA C 
+			ON C.CD_CUENTA = STG.HKONT
+	left join DIM_CECO CECO 
+			ON CECO.CD_CECO = STG.KOSTL
+	left join DIM_CEBE_PRCTR CEBE 
+			ON CEBE.CD_CEBE = STG.PRCTR
+	where STG.BUKRS='6A00' 
+	AND (BUKRS, GJAHR, BELNR, DOCLN, "TIMESTAMP") IN 
+		(SELECT	BUKRS, GJAHR, BELNR, DOCLN, Max("TIMESTAMP") "TIMESTAMP" --Ultima versión del dato y solo los del periodo filtrado     
+		 FROM STG_0FI_GL_14
+		 WHERE FISCPER = :Periodo
+		 AND BLART != 'I1' AND BLART != 'WA'
+		 GROUP BY BUKRS, GJAHR, BELNR, DOCLN)
+	AND (STG.BLART = 'WA' OR STG.BLART = 'I1')
+	AND (STG.FISCPER = :Periodo)
+	AND (STG.BELNR BETWEEN :BELNR_Desde AND :BELNR_Hasta)
+	AND ITEMS<1  --ITEMS<1 filtra solo los documentos que no han sido previamente cargados.
+	GROUP BY EMP.CD_DW_EMPRESA, STG.BELNR, STG.DOCLN, B.CD_DW_BKPF,B.CD_EJERCICIO;
+
+	select ifnull(count(*),0) into n from :FIGL;
+	
+	IF :n>0 THEN
+		insert into "FT_FIGLITEM"("CD_DW_EMPRESA","CD_DW_BELNR","CD_DW_BUZEI","CD_PERIODO","CD_DW_CUENTA","CD_DW_CECO","CD_DW_CEBE","FE_BUDAT","CD_DRCRK","VL_HSL","VL_OSL") 
+		select S."CD_DW_EMPRESA",S."CD_DW_BELNR",S."CD_DW_BUZEI",S."CD_PERIODO",S."CD_DW_CUENTA",S."CD_DW_CECO",S."CD_DW_CEBE",S."FE_BUDAT",S."CD_DRCRK",S."VL_HSL",S."VL_OSL"
+		from :FIGL S;
+		COMMIT;
+		
+		--Datos de control
+		--Se actualiza para cada documento cargado, el # de posiciones y el timestamp del detalle documento (generalmente diferente al del encabezado)
+		MERGE INTO DIM_DOCFI D 
+		USING (	SELECT CD_DW_BELNR, CD_EJERCICIO, MAX(CD_DW_BUZEI) ITEMS, Max("TIMESTAMP") TIMESTMP
+				FROM :FIGL  
+				GROUP BY CD_DW_BELNR, CD_EJERCICIO) F 
+			ON F.CD_DW_BELNR  = D.CD_DW_BKPF 
+			AND F.CD_EJERCICIO = D.CD_EJERCICIO  --Por mejor práctica, se debe hacer join indicando la partición (AÑO)
+		WHEN MATCHED THEN UPDATE SET
+			D.ITEMS = F.ITEMS,			--Cantidad de posiciones del documento FI (BKPF)
+			D.TIMESTMP = F.TIMESTMP;	--Último Timestamp de las posiciones
+		
+		COMMIT;
+
+		--Para KOBA, los encabezado de documento se actualizan con los centros de beneficio para la cuenta de ingresos, 
+		--con el fin de que al cargar las partidas de la COEP, estas queden almacenadas con su centro de beneficio correspondiente al documento FI
+		--Se Utiliza en el Sales By Item (Pq la COEP no viene por CEBE) y en el cálculo del VAT.
+		
+		docfi=	SELECT "CD_DW_BELNR",Max("CD_DW_CEBE") CD_DW_CEBE, Max(F.PRCTR) PRCTR
+				FROM :FIGL F
+				WHERE (CD_DW_CUENTA=1441 OR CD_DW_CUENTA=1522) AND "CD_DW_CEBE"<>0 --Se toma el CEBE de las partidas de cuentas de ingresos
+				GROUP BY "CD_DW_BELNR";
+		
+		merge into DIM_DOCFI D
+		using :docfi F on (F.CD_DW_BELNR = D.CD_DW_BKPF)
+		when matched then update set D.CD_DW_CEBE = F.CD_DW_CEBE, D.CD_CEBE = F.PRCTR;
+		COMMIT;
+		
+		----------    ACTUALIZACION DE LA TABLA ETL CONTROL		----------						
+		--Cantidad de registros cargados para la clase de documento	
+		select Count(CD_DW_BELNR) 
+		into M
+		from :FIGL;
+
+		--Cantidad de registros cargados a la FACT TABLE según la carga delta del 0FI_GL_14
+		
+		insert into ETL_CONTROL_CARGUE(TABLA,FECHA_CARGA,TIPO_CARGA,BUKRS,GJAHR,BELNR_DESDE,BELNR_HASTA,TIMESTMP_DESDE,TIMESTMP_HASTA,ULTIMA_FECHA,REGISTROS_PROCESADOS)
+		select 'FT_FIGLITEM_FIGL14',ADD_SECONDS(now(),-5*3600),'D',:pBUKRS,min(CD_EJERCICIO),Min(S."BELNR"),Max(S."BELNR"),Min(S."TIMESTAMP"),Max(S."TIMESTAMP"),Max(FE_BUDAT),Count(CD_DW_BUZEI)
+		from :FIGL S;
+		COMMIT;
+	END IF;
+
+END

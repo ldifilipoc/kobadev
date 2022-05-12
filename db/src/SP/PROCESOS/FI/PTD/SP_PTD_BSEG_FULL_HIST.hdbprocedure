@@ -1,0 +1,54 @@
+PROCEDURE "SP_PTD_BSEG_FULL_HIST"(EJERCICIO VARCHAR(4))
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+    Procedimiento similiar al SP_PTD_BSEG_FULL pero para cargar años anteriores
+   *************************************/   
+	Declare i int=0;
+	Declare M bigint=0;
+	Declare pFECHA_CARGA Datetime;
+	Declare pTabla VARCHAR(50)= 'BSEG';
+	Declare pReg bigint = 0;
+
+	DECLARE CURSOR Cursor_BELNR_Faltantes FOR
+	SELECT substring(CD_BELNR,1,7) Consec, CD_EJERCICIO, Min(CD_BELNR) BELNR_Desde, Max(CD_BELNR) BELNR_Hasta, Count(CD_BELNR) Cantidad
+	FROM DIM_DOCFI
+	WHERE CD_EJERCICIO = :EJERCICIO
+	AND BSTAT = ''
+	AND ITEMS = -1
+	GROUP BY substring(CD_BELNR,1,7),CD_EJERCICIO;
+
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+
+	FOR cur_BELNR_Faltantes_row AS Cursor_BELNR_Faltantes DO
+		--pBELNR_DESDE NVARCHAR(10),pBELNR_HASTA NVARCHAR(10),pEJERCICIO VARCHAR(4)
+		CALL SP_PTD_BSEG(cur_BELNR_Faltantes_row.CD_EJERCICIO,cur_BELNR_Faltantes_row.BELNR_Desde,cur_BELNR_Faltantes_row.BELNR_Hasta);
+	END FOR;
+	
+	--Si por temas de datos maestros no creados en el momento de la carga o por que las posiciones no son creadas el mismo dia,
+	--se establecen a -1 los documentos que no cargaron posiciones
+	UPDATE DIM_DOCFI
+	SET ITEMS = -1
+	WHERE CD_DW_BKPF IN (
+		SELECT DOC.CD_DW_BKPF
+		FROM DIM_DOCFI DOC,	DIM_FISPER ENT
+		WHERE DOC.ITEMS = 0
+		AND (DOC.FE_BUDAT BETWEEN ENT.DESDE1 AND ENT.HASTA1 
+			OR DOC.FE_BUDAT BETWEEN ENT.DESDE2 AND ENT.HASTA2)
+	);
+
+	UPDATE DIM_DOCFI
+	SET POS_ITEMS = -1
+	WHERE CD_DW_BKPF IN (
+		SELECT DOC.CD_DW_BKPF
+		FROM DIM_DOCFI DOC,	DIM_FISPER ENT
+		WHERE DOC.POS_ITEMS = 0 AND CD_BLART != 'WA' AND CD_BLART != 'I1'
+		AND (DOC.FE_BUDAT BETWEEN ENT.DESDE1 AND ENT.HASTA1 
+			OR DOC.FE_BUDAT BETWEEN ENT.DESDE2 AND ENT.HASTA2)
+	);
+	
+	
+END

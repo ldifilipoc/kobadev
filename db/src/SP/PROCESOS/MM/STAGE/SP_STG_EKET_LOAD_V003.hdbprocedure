@@ -1,0 +1,40 @@
+PROCEDURE "SP_STG_EKET_LOAD_V003"(pTipoCarga VARCHAR(1),pEBELN_DESDE NVARCHAR(10),pEBELN_HASTA NVARCHAR(10))
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+	Carga delta de entregas de compra
+	Fecha de Creación:02/12/2020
+	Fecha de Modificación:16/01/2021
+	Creado por: CORG
+	Modifica:CORG
+	Motivo cambio: Manejo de Deltas
+	
+	Tabla Virtual usada:	VT_ABAP_EKET (Item/Posición de compra)
+							
+	Las virtual table fueron creadas por el replication task
+	Stage table: STG_ABAP_EKET
+	Hecho destino: FT_COMPRAS
+   *************************************/
+	Declare V_SQL NVARCHAR(2000);
+	Declare pETENR VARCHAR(10) = CHAR(39) || '0001' || CHAR(39); --CHAR(39) =Comillas simples
+	
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+
+	V_SQL = 'INSERT INTO KOBA_HDI_DB_1.STG_ABAP_EKET(MANDT,EBELN,EBELP,EINDT,SLFDT,BEDAT,ETENR) '||
+			'SELECT MANDT,EBELN,EBELP,EINDT,SLFDT,BEDAT,ETENR '||
+			'FROM KOBA_HDI_DB_1.VT_ABAP_EKET '||
+			'WHERE EBELN>='''||:pEBELN_DESDE||''' AND EBELN<='''||:pEBELN_HASTA||''' AND ETENR='||:pETENR;
+	EXECUTE IMMEDIATE V_SQL;
+	COMMIT;
+
+	INSERT INTO ETL_CONTROL_CARGUE(TABLA,TIPO_CARGA,FECHA_CARGA,BUKRS,GJAHR,BLART,BELNR_DESDE,BELNR_HASTA,REGISTROS_PROCESADOS)
+	SELECT 'STG_ABAP_EKET',:pTipoCarga,add_seconds(now(),-18000),'',Max(YEAR(BEDAT)),'',Min(EBELN),Max(EBELN),Count(EBELN)
+	FROM STG_ABAP_EKET
+	WHERE EBELN>=:pEBELN_DESDE AND EBELN<=:pEBELN_HASTA;
+
+	COMMIT;
+		
+END

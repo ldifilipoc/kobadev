@@ -1,0 +1,78 @@
+PROCEDURE "SP_FT_MSEG_AUX_FALTANTES"(pGJAHR VARCHAR(4), pBELNR_DESDE bigint,pBELNR_HASTA bigint)
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   
+    Declare vID VARCHAR(10);
+    Declare vID_int bigint;
+    Declare vRango_Desde VARCHAR(10);
+    Declare vRango_Hasta VARCHAR(10);
+	Declare vCount INT;
+	Declare vRegistros INT;
+	
+
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+       
+    --truncate table FT_MSEG_AUX_FALTANTES;
+      
+	for vID_int in :pBELNR_DESDE .. :pBELNR_HASTA DO
+	
+		vID = to_varchar(vID_int);
+	
+		SELECT	count(*)
+		INTO	vCount
+		FROM	ETL_CONTROL_CARGUE
+		WHERE	TABLA = 'FT_MSEG' 
+		AND 	GJAHR = :pGJAHR
+		AND		vID between belnr_desde and belnr_hasta;
+		
+		if vCount = 0 THEN -- El valor no existe en la FT_MSEG
+			
+			if vRango_Desde is null THEN -- Es el primer valor del rango
+			
+				vRango_Desde = vID;
+				vRango_Hasta = vID;
+				vRegistros = 1;
+				
+				ELSE
+				
+				if to_varchar(to_bigint(vRango_Hasta)+1) = vID THEN
+					
+					vRango_Hasta = vID;
+					vRegistros = vRegistros +1;
+				
+				ELSE
+					
+					insert into FT_MSEG_AUX_FALTANTES (gjahr,belnr_desde,belnr_hasta,cantidad)
+					values (:pGJAHR,vRango_Desde,vRango_Hasta,vRegistros);
+					
+					vRango_Desde = vID;
+					vRango_Hasta = vID;
+					vRegistros = 1;
+					
+				end if;
+				
+			end if;
+			
+		ELSE
+			if vRango_Desde is not null THEN
+				
+				insert into FT_MSEG_AUX_FALTANTES (gjahr,belnr_desde,belnr_hasta,cantidad)
+				values (:pGJAHR,vRango_Desde,vRango_Hasta,vRegistros);
+				
+				vRango_Desde = null;
+				
+			end if;
+		
+		end if ;
+		
+	END for;
+	
+	if vCount = 0 then
+		insert into FT_MSEG_AUX_FALTANTES (gjahr,belnr_desde,belnr_hasta,cantidad)
+		values (:pGJAHR,vRango_Desde,vRango_Hasta,vRegistros);
+	end if;
+	
+END

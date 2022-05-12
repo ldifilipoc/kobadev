@@ -1,0 +1,62 @@
+PROCEDURE "SP_PTD_COEP_DIFERENCIAS_V001"(pPeriodo INT)
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+       Proceso para control en las diferencias entre el Sales By Item y la Contabilidad
+       El resultado en este query debe ser 0 registros
+       'I1': Documentos de venta cargados vía POS
+       'X1': Documentos de anulación del I1
+       Cuentas de ingreso: '4135150000','4175350000','4175350200'
+       Cuentas de IVA: '2408100000','2408150002'
+       Cuentas Impoconsummo: '1355950000','2495100000'
+   *************************************/
+		truncate table ETL_CONTROL_COEP;
+		commit;
+		INSERT INTO ETL_CONTROL_COEP("FECHA","CD_DW_CEBE","CD_DW_BKPF","BELNR","INGRESO_FI","INGRESO_CO","IVA_FI","IVA_CO","IMPOCONSUMO_FI","IMPOCONSUMO_CO")
+		select	FE_BUDAT,Doc.CD_DW_CEBE,CD_DW_BKPF,CD_BELNR,sum(doc.INGRESOS_ITEM),sum(doc.INGRESOS_COEP),Sum(IVA_FI),Sum(IVA_COEP),sum(IMPOCONSUMO_FI),sum(IMPOCONSUMO_COEP)
+		from ( (select	F.CD_DW_CEBE,D.CD_DW_BKPF,D.CD_BELNR,D.FE_BUDAT,
+						sum(CASE WHEN (C.CD_CUENTA in ('4135150000','4175350000','4175350200')) tHEN (CASE WHEN  F.CD_DRCRK= 'S'  THEN -VL_HSL*100 ELSE -VL_HSL*100 END) ELSE 0 END) INGRESOS_ITEM,
+						0 INGRESOS_COEP,
+						0 IVA_COEP, 
+						sum(CASE WHEN (C.CD_CUENTA in ('2408100000','2408150002')) THEN -VL_HSL*100 ELSE 0 END)  IVA_FI,
+						sum(CASE WHEN (C.CD_CUENTA in ('1355950000','2495100000')) THEN -VL_HSL*100 ELSE 0 END)  IMPOCONSUMO_FI,
+						0 IMPOCONSUMO_COEP
+				from "FT_FIGLITEM" F 
+				inner join DIM_CUENTA C on C.CD_DW_CUENTA=F.CD_DW_CUENTA
+				inner join DIM_DOCFI D on D.CD_DW_BKPF = F.CD_DW_BELNR
+				where	F.CD_PERIODO = :pPeriodo  
+						and D.XREVERSAL = ''
+						and C.CD_CUENTA in ('4135150000','4175350000','4175350200','2408100000','2408150002','1355950000','2495100000')
+						and (D.CD_BLART in ('I1','X1')) 
+				group by F.CD_DW_CEBE,D.CD_BELNR,D.CD_DW_BKPF,D.FE_BUDAT
+		) union (
+				select	ifnull(D.CD_DW_CEBE,0) CD_DW_CEBE,
+						D.CD_DW_BKPF,
+						CD_BELNR,
+						D.FE_BUDAT,
+						0 INGRESOS_ITEM, 
+						sum(F.VL_WTGBTR) INGRESOS_COEP, 
+						Sum((case when C.CD_CUENTA='4175350000' THEN -1 ELSE 1 END)* ifnull(P.VL_IVA,0)) IVA_COEP,
+						0 IVA_FI,  
+						0 IMPOCONSUMO_FI, 
+						Sum((case when C.CD_CUENTA='4175350000' THEN -1 ELSE 1 END)* ifnull(P.VL_IMPOCONSUMO,0)) VL_IMPOCONSUMO
+				from "FT_COEP" F 
+				inner join "DIM_CUENTA" C on C.CD_DW_CUENTA = F.CD_DW_CUENTA
+				left join DIM_DOCFI D on D.CD_DW_BKPF = F.CD_DW_BKPF
+				left join FT_COEP_ZTPOS P 
+				ON P.CD_DW_BKPF = F.CD_DW_BKPF AND  P.CD_ITEM =  F.CD_ITEM AND P.CD_PERIODO = F.CD_PERIODO
+				where	F.CD_PERIODO = :pPeriodo
+						and D.XREVERSAL = ''
+						and C.CD_CUENTA in ('4135150000','4175350000','4175350200')
+						and (D.CD_BLART in ('I1','X1'))  
+				group by D.CD_DW_CEBE,CD_BELNR,D.CD_DW_BKPF,D.FE_BUDAT 
+		)) doc
+		group by Doc.CD_DW_CEBE,FE_BUDAT,CD_DW_BKPF,CD_BELNR  
+		having	ABS(sum(doc.INGRESOS_ITEM)+sum(doc.INGRESOS_COEP))>0	
+		OR		ABS(sum(doc.IVA_FI)-sum(doc.IVA_COEP))>100 
+		OR		ABS(sum(IMPOCONSUMO_FI)-sum(IMPOCONSUMO_COEP))>100
+		;
+		
+END

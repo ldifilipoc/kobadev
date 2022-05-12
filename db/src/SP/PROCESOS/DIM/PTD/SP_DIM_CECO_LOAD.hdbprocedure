@@ -1,0 +1,49 @@
+PROCEDURE "SP_DIM_CECO_LOAD"( )
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+	declare Consecutivo int;
+
+	--DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    --   SELECT ::SQL_ERROR_CODE ERROR_CECOE, ::SQL_ERROR_MESSAGE ERROR_CECO_MSG FROM TDUMMY;	
+   /*************************************
+   CENTROS DE COSTOS
+   
+	Centros de costos de KOBA.
+	Filtros de la tarea de replicación:
+		LANGU='S' 
+		KOKRS = '6100'
+   *************************************/
+   
+	--Se replican los datos a la tabla de stage
+	call "RT_0COSTCENTER_TEXT.START_REPLICATION";
+	
+	--Último CECO válido
+	Cecos = select KOSTL, Max(DATEFROM) DATEFROM
+			from STG_0COSTCENTER_TEXT
+			group by KOSTL; 
+			
+	--Se obtiene el ultimo consecutivo para centros de costo
+	select Max(CD_DW_CECO) into Consecutivo from "DIM_CECO";
+	
+	--Se insertan los nuevos centros de costo
+	INSERT INTO DIM_CECO(CD_DW_CECO,CD_CECO,CD_EMPRESA,NM_CECO,NM_CECO_ST,FE_DATETO,FE_DATEFROM,FE_CREACION, CD_JERARQUIA3)
+	select :Consecutivo + ROW_NUMBER() OVER (ORDER BY T.KOSTL), T.KOSTL, T.KOKRS, T.TXTMD, T.TXTSH , T.DATETO , T.DATEFROM , T.DATEFROM,''
+	from STG_0COSTCENTER_TEXT T
+	inner join :Cecos CECO 
+		ON CECO.KOSTL = T.KOSTL
+		AND CECO.DATEFROM = T.DATEFROM
+	left join DIM_CECO DIM 
+		ON DIM.CD_CECO = T.KOSTL
+	where DIM.CD_DW_CECO IS NULL; --Solo los nuevos CECOS
+	COMMIT;
+
+	insert into ETL_CONTROL_CARGUE(TABLA,FECHA_CARGA,BUKRS,GJAHR,BELNR_DESDE,BELNR_HASTA,TIMESTMP_DESDE,TIMESTMP_HASTA,ULTIMA_FECHA,REGISTROS_PROCESADOS)
+	select 'DIM_CECO',now(),'0000',substr(Max(ERSDA),0,4),'','',0,0,Max(ERSDA),Count(*)
+	from STG_0COSTCENTER_ATTR;
+	COMMIT;
+	
+	truncate table "STG_0COSTCENTER_TEXT";
+	
+END

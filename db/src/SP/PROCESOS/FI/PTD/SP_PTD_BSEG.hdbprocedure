@@ -1,0 +1,125 @@
+PROCEDURE "SP_PTD_BSEG"(pGJAHR VARCHAR(4), pBELNR_DESDE VARCHAR(10), pBELNR_HASTA VARCHAR(10))
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+   PTD: Proceso de transferencia de datos
+	Carga de documentos de forma manual
+	Se utiliza ante cualquier eventualidad del extractor estándar 0FI_GL_14
+	
+	Fecha de Creación:02/12/2019
+	Creado por: CORG
+	Modifica:CORG
+	Motivo cambio:	
+					
+	Stage table:  STG_ABAP_BSEG
+	Hecho destino: FT_FIGLITEM
+   *************************************/
+	Declare i int=0;
+	Declare M bigint=0;
+	Declare pFECHA_CARGA Datetime;
+	Declare pTabla VARCHAR(50)= 'BSEG';
+	Declare pReg bigint = 0;
+	
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+       
+ 		--limpieza de las tablas de stage
+		truncate table STG_ABAP_BSEG;
+		COMMIT;
+		--Procesa/carga para cada rango de documentos FI y clase de documento 	
+		CALL SP_STG_BSEG_LOAD_V001(pGJAHR, pBELNR_DESDE,pBELNR_HASTA);
+
+		--20/04/2021: Se detecta que en la BSEG las cuentas de balance no traen Centro de Beneficio, se corrige debido a que el IVA se contabiliza en estas cuentas y se requiere por tienda
+		--Se obtiene del código de asignación asociado al campo ZUONR
+		MERGE INTO STG_ABAP_BSEG STG 
+		USING ( SELECT Max(CD_PRCTR) CD_PRCTR,Max(CD_CECO) CD_CECO,CD_ZCTDA 
+				FROM DIM_CEBE_CLIENTE 
+				WHERE FE_HASTA='9999-12-31' AND CD_ZCTDA != ''
+				GROUP BY CD_ZCTDA) TIENDA 
+			ON TIENDA.CD_ZCTDA = STG.ZUONR
+		WHEN MATCHED AND PRCTR ='' THEN UPDATE SET PRCTR = CD_PRCTR;
+		
+		MERGE INTO STG_ABAP_BSEG STG 
+		USING ( SELECT Max(CD_PRCTR) CD_PRCTR,Max(CD_CECO) CD_CECO,CD_ZCTDA 
+				FROM DIM_CEBE_CLIENTE 
+				WHERE FE_HASTA='9999-12-31' AND CD_ZCTDA != ''
+				GROUP BY CD_ZCTDA) TIENDA 
+			ON TIENDA.CD_ZCTDA = STG.ZUONR
+		WHEN MATCHED AND KOSTL ='' THEN UPDATE SET KOSTL = CD_CECO;
+		COMMIT;
+		
+		PartidasIndividuales=	
+		SELECT 	DOC.CD_DW_BKPF, cast(BUZEI as smallint) CD_ITEM,  --DOCLN se Carga en BUZEI
+				TO_CHAR(DOC.FE_BUDAT,'YYYYMM') CD_PERIODO,
+				CTA.CD_DW_CUENTA,
+				ifnull(CECO.CD_DW_CECO,0) CD_DW_CECO, 
+				ifnull(CB.CD_DW_CEBE,0) CD_DW_CEBE, 
+				STG.WERKS,
+				STG.ANLN1,
+				STG.LIFNR,
+				STG.KUNNR,
+				STG.EBELN, STG.EBELP,
+				STG.VBELN,
+				STG.AUFNR,
+				STG.AUGBL,
+				STG.XREF1, STG.XREF3, 
+				STG.ZUONR, 
+				STG.BSCHL, 
+				DOC.FE_BUDAT, 
+				STG.SHKZG, 
+				STG.DMBTR*(CASE WHEN STG.SHKZG='H' THEN -1 ELSE 1 END) DMBTR,  
+				STG.SGTXT, 
+				STG.PRCTR,
+				STG.MWSKZ 
+		FROM STG_ABAP_BSEG STG 
+		INNER JOIN DIM_DOCFI DOC 
+			ON DOC.CD_BELNR = STG.BELNR 
+			AND STG.GJAHR = DOC.CD_EJERCICIO  
+		INNER JOIN DIM_CUENTA CTA  
+			ON CTA.CD_CUENTA  = STG.HKONT 
+		LEFT JOIN DIM_CEBE_PRCTR CB 
+			ON CB.CD_CEBE = STG.PRCTR AND NOT STG.PRCTR=''
+		LEFT JOIN DIM_CECO CECO 
+			ON CECO.CD_CECO = STG.KOSTL AND NOT STG.KOSTL='';
+
+		DELETE FROM FT_FIGLITEM WHERE CD_DW_BELNR IN (SELECT CD_DW_BKPF FROM :PartidasIndividuales);		
+		COMMIT;
+		
+		
+		INSERT INTO FT_FIGLITEM
+	 		(CD_DW_BELNR, CD_DW_BUZEI, CD_PERIODO, CD_DW_CUENTA, CD_DW_CECO, CD_DW_CEBE, CD_WERKS, 
+			CD_ANLN1, CD_LIFNR, CD_KUNNR, CD_EBELN, CD_EBELP, CD_VBELN, CD_AUFNR, CD_AUGBL, XREF1, XREF3, 
+			ZUONR, BSCHL, FE_BUDAT, CD_DRCRK, VL_HSL, SGTXT,MWSKZ) 
+		SELECT  STG.CD_DW_BKPF,STG.CD_ITEM,	STG.CD_PERIODO, STG.CD_DW_CUENTA,STG.CD_DW_CECO,STG.CD_DW_CEBE, 
+				STG.WERKS,STG.ANLN1,STG.LIFNR,STG.KUNNR,STG.EBELN, STG.EBELP,STG.VBELN,	STG.AUFNR,STG.AUGBL,
+				STG.XREF1, STG.XREF3, STG.ZUONR, STG.BSCHL,	STG.FE_BUDAT,STG.SHKZG,	STG.DMBTR,STG.SGTXT,STG.MWSKZ 
+		FROM :PartidasIndividuales STG;
+		
+		COMMIT;
+		--Conteo de registros insertados
+		Cantidades =select	B.CD_DW_BKPF, count(F.BELNR) Cantidad, max(CB.CD_DW_CEBE) CEBE, Max(F.PRCTR) PRCTR
+					from DIM_DOCFI B  
+					left join STG_ABAP_BSEG F 
+							on B.CD_BELNR		=F.BELNR 
+							AND B.CD_EJERCICIO	=F.GJAHR 
+					LEFT JOIN DIM_CEBE_PRCTR CB 
+						ON CB.CD_CEBE = F.PRCTR AND NOT F.PRCTR=''							
+					where B.CD_BELNR BETWEEN :pBELNR_DESDE AND :pBELNR_HASTA 
+					AND B.CD_EJERCICIO = :pGJAHR
+					group by B.CD_DW_BKPF;
+
+		MERGE INTO DIM_DOCFI DIM 
+		USING :Cantidades STG 
+			ON STG.CD_DW_BKPF = DIM.CD_DW_BKPF
+		WHEN MATCHED THEN UPDATE 
+		SET DIM.ITEMS = STG.Cantidad, CD_CEBE =PRCTR, CD_DW_CEBE = CEBE ;
+		COMMIT;
+
+		truncate table STG_ABAP_BSEG;
+		COMMIT;
+		
+		CALL SP_PTD_FAGLFLEXA_FULL('','', '', :pBELNR_DESDE,:pBELNR_HASTA);
+		
+END

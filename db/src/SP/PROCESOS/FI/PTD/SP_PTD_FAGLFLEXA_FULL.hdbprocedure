@@ -1,0 +1,53 @@
+PROCEDURE "SP_PTD_FAGLFLEXA_FULL"(Clase_Doc VARCHAR(10), Desde VARCHAR(10), Hasta VARCHAR(10), BELNR_Desde VARCHAR(10), BELNR_Hasta VARCHAR(10))
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+   PTD: Proceso de transferencia de datos para cargar documentos que tienen Split por CEBE
+   Se excluyen documentos clases de documento: I1, X1
+   
+   Para agregar nuevas exclusiones debe ingresarlas en la tabla ETL_TRADUCCION, código CD_TABLA = 2
+   *************************************/
+    DECLARE Ejercicio SMALLINT;
+    DECLARE Periodo_Desde DATE;
+    DECLARE Periodo_Hasta DATE;
+    
+	DECLARE CURSOR Cursor_BELNR_Faltantes_BEZEI_CERO FOR
+	SELECT CD_BLART, substring(CD_BELNR,1,7) Consec, CD_EJERCICIO, Min(CD_BELNR) BELNR_Desde, Max(CD_BELNR) BELNR_Hasta, Count(CD_BELNR) Cantidad
+	FROM DIM_DOCFI
+	WHERE CD_EJERCICIO = 2022 
+	AND POS_ITEMS = -1 
+	AND (CD_BLART = :Clase_Doc OR :Clase_Doc = '')							--Filtro por Clase de documento: Opcional
+	AND (  (CD_BELNR BETWEEN :BELNR_Desde AND :BELNR_Hasta AND :Desde ='')  --Rango por Consecutivo: Opcional
+		OR (FE_BUDAT BETWEEN :Desde AND :Hasta AND :BELNR_Hasta ='' )		--Rango por Fecha de Contabilización: Opcional
+	)
+	AND (:Clase_Doc != '' OR NOT CD_BLART IN ('I1','X1')) --Documentos excluidos y que no tienen Split por CEBE: I1, X1
+	GROUP BY CD_BLART, substring(CD_BELNR,1,7),CD_EJERCICIO;
+	
+	--DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    --   SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+
+	SELECT TOP 1 DESDE1, HASTA2 INTO Periodo_Desde, Periodo_Hasta FROM DIM_FISPER;
+	
+	FOR c_row AS Cursor_BELNR_Faltantes_BEZEI_CERO DO
+
+		TRUNCATE TABLE STG_ABAP_FAGLFLEXA;
+		COMMIT;
+		
+		CALL SP_STG_FAGLFLEXA_LOAD_BELNR(c_row.CD_EJERCICIO,c_row.BELNR_Desde,c_row.BELNR_Hasta);
+		CALL SP_FT_FAGLFLEXA_LOAD('F');
+		
+		UPDATE DIM_DOCFI
+		SET POS_ITEMS = 0
+		WHERE CD_EJERCICIO = c_row.CD_EJERCICIO
+		AND CD_BELNR BETWEEN c_row.BELNR_Desde AND c_row.BELNR_Hasta
+		AND CD_BLART =  c_row.CD_BLART				--De la clase de documento en el rango
+		AND NOT FE_BUDAT BETWEEN :Periodo_Desde AND :Periodo_Hasta	--Documentos que no estén en el periodo contable abierto
+		AND POS_ITEMS = -1;
+		
+		COMMIT;
+		
+	END FOR;
+
+END

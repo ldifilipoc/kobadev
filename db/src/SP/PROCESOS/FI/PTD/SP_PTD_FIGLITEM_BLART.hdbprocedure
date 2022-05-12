@@ -1,0 +1,92 @@
+PROCEDURE SP_PTD_FIGLITEM_BLART(pBLART VARCHAR(2))
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+	/*************************************
+	Carga de partidas individuales de documentos cargados en el POS. 
+	Los documentos del POS tienen como tercero la tienda, por lo tanto no se carga información de tercero.
+	Parémtros:	pEmpresa=28 para KOBA
+				pBUKRS=6A00 para KOBA
+				pTipoCarga='D' para Delta o 'F' para full
+				pDesde = Fecha/Hora desde el cual se van a cargar datos, TIMESTMP_DESDE: Ultimo Timestamp ingresado en la FT_FIGLITEM + 1 segundo si es cargue delta
+				pHasta = Fecha/Hora hasta el cual se van a cargar datos
+				RLDNR = 0L Libro contable
+	Fecha de Creación:02/12/2019
+	Fecha de Modificación:11/02/2020
+	Creado por: CORG-JPIMIENTA
+	Modifica:CORG-JPIMIENTA
+	Motivo cambio:	11/02/2020	Manejo de Deltas
+					05/04/2020	Join que asegura que no se inserten timestamp de partidas individuales cuyo encabezado de documento aun no ha sido creado
+								Si alguna partida individual no tiene encabezado no se inserta en la FACT TABLE
+	Tabla Virtual usada:	VT_ABAP_FAGLFLEXA (Detalle de partidas individuales)
+							
+	Las virtual table fueron creadas por el replication task para cargue inicial/full
+	Stage table: STG_ABAP_FAGLFLEXA
+	Hecho destino: FT_FIGLITEM
+	Agendamiento de carga: En SAP CPI-DI, Proceso 2_P_FINANZAS 
+	*************************************/
+	
+	Declare i int=0;
+	Declare M bigint=0;
+	Declare pT_DESDE decimal(15,0);
+	Declare pT_HASTA decimal(15,0);
+	Declare pGJAHR Varchar(4);
+	Declare pFECHA_CARGA Datetime;
+	Declare pTabla VARCHAR(50)= 'FAGLFLEXA';
+	Declare pReg bigint = 0;
+	
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+   
+		select count(BELNR_DESDE) Registro
+		into  pReg
+		from ETL_CONTROL_CARGUE 
+		where TABLA    = :pTabla
+		  and BLART    = :pBLART
+		  and CARGA_POS='P'; --Cantidad de Cargas o rangos de documento POS pendientes
+
+		FOR i IN 1..:pReg DO
+			
+			select top 1 FECHA_CARGA, GJAHR
+			into pFECHA_CARGA, pGJAHR
+			from ETL_CONTROL_CARGUE 
+			where TABLA    = :pTabla
+			  and BLART    = :pBLART
+			  and CARGA_POS='P' --Cargas o rangos de documento POS pendientes
+			order by  FECHA_CARGA DESC, BELNR_DESDE;
+			
+			TRUNCATE TABLE STG_ABAP_FAGLFLEXA;
+			CALL SP_STG_FAGLFLEXA_BLART(:pBLART);
+			CALL SP_FT_FIGLITEM_LOAD_V001('D');
+			
+			select max(T_DESDE), max(T_HASTA), max(Cantidad)
+			into pT_DESDE, pT_HASTA, M
+			from (
+			select	min(F."TIMESTAMP") T_DESDE, 
+					Max(F."TIMESTAMP") T_HASTA,
+					count(F.BELNR) Cantidad
+			from STG_ABAP_FAGLFLEXA F 
+			inner join DIM_DOCFI B 
+					on B.CD_BELNR		=F.BELNR 
+					AND B.CD_EJERCICIO	=F.GJAHR 
+					AND B.CD_DW_EMPRESA	=28
+			group by B.CD_EJERCICIO
+			union --En caso de llegar vacio, para evitar error se une con el valor 0
+			select 0 T_DESDE,0 T_HASTA,0 Cantidad
+			from TDUMMY) Det;
+			
+			update ETL_CONTROL_CARGUE 
+			set CARGA_POS='X',
+				REGISTROS_PROCESADOS=:M, 
+				TIMESTMP_DESDE = pT_DESDE, 
+				TIMESTMP_HASTA = pT_HASTA
+			where TABLA=:pTabla
+			AND GJAHR=:pGJAHR 
+			AND BLART=:pBLART 
+			AND FECHA_CARGA = :pFECHA_CARGA;
+			commit;
+			i = :i + 1;
+			
+		END FOR;
+END

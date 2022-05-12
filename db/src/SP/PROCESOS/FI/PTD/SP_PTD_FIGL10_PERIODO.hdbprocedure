@@ -1,0 +1,20 @@
+PROCEDURE "SP_PTD_FIGL10_PERIODO"(Periodo varchar(7))
+   LANGUAGE SQLSCRIPT
+   SQL SECURITY INVOKER
+   AS
+BEGIN
+   /*************************************
+       Cargue de la información del periodo
+   *************************************/
+   DECLARE Per INT;
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM TDUMMY;
+	
+    truncate table STG_0FI_GL_10;
+    CALL SP_STG_FIGL10_LOAD_V001(:Periodo);
+    CALL SP_FT_FIGL_LOAD_V001(:Periodo);
+    
+    Per  = LEFT(:Periodo,4) || Right(:Periodo,2);
+	--CALL SP_PTD_SALDOS_PARA_CONSOLIDACION(:Per);
+	
+END
